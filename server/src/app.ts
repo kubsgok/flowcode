@@ -1,0 +1,62 @@
+import express from 'express';
+import cors from 'cors';
+import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
+
+import { config } from './config/env';
+import { connectDatabase } from './config/database';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import routes from './routes';
+
+const app = express();
+
+// Trust proxy for rate limiting behind reverse proxy
+app.set('trust proxy', 1);
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: {
+    success: false,
+    error: { message: 'Too many requests, please try again later' },
+  },
+});
+
+// Middleware
+app.use(cors({ origin: config.cors.origin, credentials: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+if (config.nodeEnv === 'development') {
+  app.use(morgan('dev'));
+}
+
+app.use('/api', limiter);
+
+// Routes
+app.use('/api', routes);
+
+// Error handling
+app.use(notFoundHandler);
+app.use(errorHandler);
+
+// Start server
+const startServer = async () => {
+  try {
+    await connectDatabase();
+
+    app.listen(config.port, '0.0.0.0', () => {
+      console.log(
+        `Server running in ${config.nodeEnv} mode on port ${config.port}`
+      );
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
+
+export default app;
