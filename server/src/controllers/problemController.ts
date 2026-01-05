@@ -14,9 +14,9 @@ const listProblemsSchema = z.object({
     .optional(),
   search: z.string().optional(),
   sortBy: z
-    .enum(['popularity', 'successRate', 'createdAt', 'difficulty'])
-    .default('createdAt'),
-  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+    .enum(['popularity', 'successRate', 'createdAt', 'difficulty', 'concept'])
+    .default('concept'),
+  sortOrder: z.enum(['asc', 'desc']).default('asc'),
 });
 
 export const getProblems = asyncHandler(
@@ -37,9 +37,18 @@ export const getProblems = asyncHandler(
       }
     );
 
+    // Transform _id to id for frontend
+    const transformedItems = result.items.map((item: any) => ({
+      ...item,
+      id: item._id.toString(),
+    }));
+
     res.status(200).json({
       success: true,
-      data: result,
+      data: {
+        ...result,
+        items: transformedItems,
+      },
     });
   }
 );

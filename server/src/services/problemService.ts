@@ -12,7 +12,7 @@ interface ProblemFilters {
 interface PaginationOptions {
   page: number;
   limit: number;
-  sortBy?: 'popularity' | 'successRate' | 'createdAt' | 'difficulty';
+  sortBy?: 'popularity' | 'successRate' | 'createdAt' | 'difficulty' | 'concept';
   sortOrder?: 'asc' | 'desc';
 }
 
@@ -29,7 +29,7 @@ export class ProblemService {
     filters: ProblemFilters,
     pagination: PaginationOptions
   ): Promise<PaginatedResult<IProblem>> {
-    const { page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc' } = pagination;
+    const { page = 1, limit = 20, sortBy = 'concept', sortOrder = 'asc' } = pagination;
     const skip = (page - 1) * limit;
 
     // Build query
@@ -54,9 +54,15 @@ export class ProblemService {
       query.isActive = filters.isActive;
     }
 
-    // Build sort
+    // Build sort - 'concept' sorts by first concept in array, then by difficulty
     const sortOptions: Record<string, 1 | -1> = {};
-    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    if (sortBy === 'concept') {
+      // Sort by first concept alphabetically, then by difficulty score
+      sortOptions['concepts.0'] = sortOrder === 'asc' ? 1 : -1;
+      sortOptions['difficultyScore'] = 1;
+    } else {
+      sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    }
 
     const [items, total] = await Promise.all([
       Problem.find(query)

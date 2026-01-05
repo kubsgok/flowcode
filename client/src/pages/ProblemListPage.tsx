@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { problemApi } from '../api/problemApi';
+import { authApi } from '../api/authApi';
 import { Spinner } from '../components/common/Spinner';
 import {
   Code2,
@@ -11,9 +12,17 @@ import {
   ChevronRight,
   LogOut,
   Shuffle,
+  CheckCircle2,
+  Circle,
+  XCircle,
+  ArrowUpDown,
+  Target,
 } from 'lucide-react';
 import type { ProblemSummary, Difficulty, Concept } from '@flowcode/shared';
 import { CONCEPT_LABELS } from '@flowcode/shared';
+
+type ProblemStatus = 'solved' | 'attempted' | 'unsolved';
+type SortOption = 'concept' | 'difficulty' | 'successRate' | 'title';
 
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard'];
 const POPULAR_CONCEPTS: Concept[] = [
@@ -29,21 +38,46 @@ const POPULAR_CONCEPTS: Concept[] = [
 export function ProblemListPage() {
   const { user, logout } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
 
   const [problems, setProblems] = useState<ProblemSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [problemStatuses, setProblemStatuses] = useState<{
+    solved: Set<string>;
+    attempted: Set<string>;
+  }>({ solved: new Set(), attempted: new Set() });
 
   // Filters from URL
   const page = parseInt(searchParams.get('page') || '1', 10);
   const search = searchParams.get('search') || '';
   const difficulty = searchParams.get('difficulty') as Difficulty | null;
   const concepts = searchParams.get('concepts')?.split(',').filter(Boolean) as Concept[] || [];
+  const sortBy = (searchParams.get('sortBy') as SortOption) || 'concept';
+  const sortOrder = (searchParams.get('sortOrder') as 'asc' | 'desc') || 'asc';
+  const statusFilter = searchParams.get('status') as ProblemStatus | 'all' | null;
 
   const [searchInput, setSearchInput] = useState(search);
   const [showFilters, setShowFilters] = useState(false);
+
+  // Fetch problem statuses on mount and when navigating back to this page
+  const fetchStatuses = useCallback(async () => {
+    try {
+      const statuses = await authApi.getProblemStatus();
+      setProblemStatuses({
+        solved: new Set(statuses.solved),
+        attempted: new Set(statuses.attempted),
+      });
+    } catch (err) {
+      console.error('Failed to fetch problem statuses:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStatuses();
+  }, [fetchStatuses, location.key]);
 
   useEffect(() => {
     const fetchProblems = async () => {
@@ -51,15 +85,42 @@ export function ProblemListPage() {
       setError('');
 
       try {
+        // Map frontend sort options to API sort options
+        const apiSortBy = sortBy === 'title' ? 'createdAt' : sortBy;
+
         const result = await problemApi.getProblems({
           page,
           limit: 20,
           search: search || undefined,
           difficulty: difficulty || undefined,
           concepts: concepts.length > 0 ? concepts : undefined,
+          sortBy: apiSortBy,
+          sortOrder,
         });
 
-        setProblems(result.items);
+        // Client-side sort by title if needed (since API doesn't support title sort)
+        let items = result.items;
+        if (sortBy === 'title') {
+          items = [...items].sort((a, b) => {
+            const cmp = a.title.localeCompare(b.title);
+            return sortOrder === 'asc' ? cmp : -cmp;
+          });
+        }
+
+        // Client-side filter by status (depends on user data)
+        if (statusFilter && statusFilter !== 'all') {
+          items = items.filter((problem) => {
+            const isSolved = problemStatuses.solved.has(problem.id);
+            const isAttempted = problemStatuses.attempted.has(problem.id);
+
+            if (statusFilter === 'solved') return isSolved;
+            if (statusFilter === 'attempted') return isAttempted;
+            if (statusFilter === 'unsolved') return !isSolved && !isAttempted;
+            return true;
+          });
+        }
+
+        setProblems(items);
         setTotalPages(result.totalPages);
         setTotal(result.total);
       } catch (err) {
@@ -71,7 +132,7 @@ export function ProblemListPage() {
     };
 
     fetchProblems();
-  }, [page, search, difficulty, concepts.join(',')]);
+  }, [page, search, difficulty, concepts.join(','), sortBy, sortOrder, statusFilter, problemStatuses]);
 
   const updateFilters = (updates: Record<string, string | null>) => {
     const newParams = new URLSearchParams(searchParams);
@@ -90,6 +151,12 @@ export function ProblemListPage() {
     }
 
     setSearchParams(newParams);
+  };
+
+  const getStatus = (problemId: string): ProblemStatus => {
+    if (problemStatuses.solved.has(problemId)) return 'solved';
+    if (problemStatuses.attempted.has(problemId)) return 'attempted';
+    return 'unsolved';
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -113,12 +180,25 @@ export function ProblemListPage() {
       <header className="border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <Link to="/" className="flex items-center gap-2">
-              <Code2 className="w-8 h-8 text-primary-500" />
-              <span className="text-xl font-bold text-white">FlowCode</span>
-            </Link>
+            <div className="flex items-center gap-6">
+              <Link to="/" className="flex items-center gap-2">
+                <Code2 className="w-8 h-8 text-primary-500" />
+                <span className="text-xl font-bold text-white">FlowCode</span>
+              </Link>
+              <span className="text-slate-600">|</span>
+              <span className="text-sm text-slate-400">Practice Mode</span>
+            </div>
 
             <div className="flex items-center gap-4">
+              {user?.preferredMode === 'guided' && (
+                <Link
+                  to="/guided"
+                  className="flex items-center gap-1.5 text-primary-400 hover:text-primary-300 transition-colors"
+                >
+                  <Target className="w-4 h-4" />
+                  <span className="hidden sm:inline">Guided Mode</span>
+                </Link>
+              )}
               <span className="text-slate-300">{user?.displayName}</span>
               <button
                 onClick={logout}
@@ -156,12 +236,34 @@ export function ProblemListPage() {
             >
               <Filter className="w-4 h-4" />
               Filters
-              {(difficulty || concepts.length > 0) && (
+              {(difficulty || concepts.length > 0 || statusFilter) && (
                 <span className="bg-primary-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                  {(difficulty ? 1 : 0) + concepts.length}
+                  {(difficulty ? 1 : 0) + concepts.length + (statusFilter ? 1 : 0)}
                 </span>
               )}
             </button>
+
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-2">
+              <ArrowUpDown className="w-4 h-4 text-slate-400" />
+              <select
+                value={`${sortBy}-${sortOrder}`}
+                onChange={(e) => {
+                  const [newSortBy, newSortOrder] = e.target.value.split('-') as [SortOption, 'asc' | 'desc'];
+                  updateFilters({ sortBy: newSortBy, sortOrder: newSortOrder });
+                }}
+                className="input py-2 pr-8 bg-slate-800 border-slate-700"
+              >
+                <option value="concept-asc">Topic (A-Z)</option>
+                <option value="concept-desc">Topic (Z-A)</option>
+                <option value="difficulty-asc">Difficulty (Easy first)</option>
+                <option value="difficulty-desc">Difficulty (Hard first)</option>
+                <option value="successRate-desc">Acceptance (High first)</option>
+                <option value="successRate-asc">Acceptance (Low first)</option>
+                <option value="title-asc">Title (A-Z)</option>
+                <option value="title-desc">Title (Z-A)</option>
+              </select>
+            </div>
 
             {/* Random Problem */}
             <Link to="/practice/random" className="btn btn-secondary flex items-center gap-2">
@@ -197,6 +299,36 @@ export function ProblemListPage() {
                 </div>
               </div>
 
+              {/* Status */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Status
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: 'solved', label: 'Solved', color: 'text-success-500 bg-success-500/20 ring-success-500' },
+                    { value: 'attempted', label: 'Attempted', color: 'text-warning-500 bg-warning-500/20 ring-warning-500' },
+                    { value: 'unsolved', label: 'Unsolved', color: 'text-slate-400 bg-slate-600/50 ring-slate-500' },
+                  ].map((status) => (
+                    <button
+                      key={status.value}
+                      onClick={() =>
+                        updateFilters({
+                          status: statusFilter === status.value ? null : status.value,
+                        })
+                      }
+                      className={`badge cursor-pointer transition-colors ${
+                        statusFilter === status.value
+                          ? `${status.color} ring-1`
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      {status.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Concepts */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -220,7 +352,7 @@ export function ProblemListPage() {
               </div>
 
               {/* Clear Filters */}
-              {(difficulty || concepts.length > 0 || search) && (
+              {(difficulty || concepts.length > 0 || search || statusFilter) && (
                 <button
                   onClick={() => {
                     setSearchInput('');
@@ -254,7 +386,11 @@ export function ProblemListPage() {
         ) : (
           <div className="space-y-2">
             {problems.map((problem) => (
-              <ProblemRow key={problem.id} problem={problem} />
+              <ProblemRow
+                key={problem.id}
+                problem={problem}
+                status={getStatus(problem.id)}
+              />
             ))}
           </div>
         )}
@@ -288,13 +424,28 @@ export function ProblemListPage() {
   );
 }
 
-function ProblemRow({ problem }: { problem: ProblemSummary }) {
+function ProblemRow({
+  problem,
+  status,
+}: {
+  problem: ProblemSummary;
+  status: ProblemStatus;
+}) {
+  const StatusIcon = {
+    solved: <CheckCircle2 className="w-5 h-5 text-success-500" />,
+    attempted: <XCircle className="w-5 h-5 text-warning-500" />,
+    unsolved: <Circle className="w-5 h-5 text-slate-600" />,
+  }[status];
+
   return (
     <Link
       to={`/practice/${problem.slug}`}
       className="card p-4 flex items-center justify-between hover:bg-slate-750 transition-colors block"
     >
       <div className="flex items-center gap-4">
+        {/* Status Icon */}
+        <div className="flex-shrink-0">{StatusIcon}</div>
+
         <div>
           <h3 className="text-white font-medium hover:text-primary-400 transition-colors">
             {problem.title}
@@ -318,9 +469,7 @@ function ProblemRow({ problem }: { problem: ProblemSummary }) {
       </div>
 
       <div className="flex items-center gap-4">
-        <span
-          className={`badge badge-${problem.difficulty}`}
-        >
+        <span className={`badge badge-${problem.difficulty}`}>
           {problem.difficulty.charAt(0).toUpperCase() + problem.difficulty.slice(1)}
         </span>
         <div className="text-right text-sm">

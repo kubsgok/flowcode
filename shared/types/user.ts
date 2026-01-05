@@ -13,11 +13,35 @@ export interface SkillSummary {
   lastActiveAt: Date;
 }
 
+export interface SelfAssessment {
+  arrays: number;
+  strings: number;
+  hashmaps: number;
+  twoPointers: number;
+  slidingWindow: number;
+  linkedLists: number;
+  trees: number;
+  graphs: number;
+  dynamicProgramming: number;
+  recursion: number;
+}
+
+export interface GuidedProgress {
+  currentStreak: number;
+  longestStreak: number;
+  lastCompletedDate: Date | null;
+  totalChallengesCompleted: number;
+}
+
 export interface User {
   id: string;
   email: string;
   displayName: string;
   preferences: UserPreferences;
+  preferredMode: 'guided' | 'practice' | null;
+  onboardingComplete: boolean;
+  selfAssessment: SelfAssessment | null;
+  guidedProgress: GuidedProgress;
   skillSummary: SkillSummary;
   createdAt: Date;
   updatedAt: Date;

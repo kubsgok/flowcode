@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { problemApi } from '../api/problemApi';
 import { submissionApi } from '../api/submissionApi';
+import { challengeApi } from '../api/challengeApi';
 import { SplitPane } from '../components/layout/SplitPane';
 import { Spinner } from '../components/common/Spinner';
 import Editor from '@monaco-editor/react';
@@ -20,6 +21,8 @@ import {
   Settings,
   CheckCircle,
   XCircle,
+  Target,
+  Flame,
 } from 'lucide-react';
 import type { Problem, TestCaseResult } from '@flowcode/shared';
 import { SUPPORTED_LANGUAGES } from '@flowcode/shared';
@@ -29,9 +32,14 @@ export function PracticePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // Check if user is in guided mode
+  const isGuidedUser = user?.preferredMode === 'guided';
+
   const [problem, setProblem] = useState<Problem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [streakUpdated, setStreakUpdated] = useState(false);
+  const [newStreak, setNewStreak] = useState<number | null>(null);
 
   const [code, setCode] = useState('');
   const [language, setLanguage] = useState(
@@ -207,6 +215,17 @@ export function PracticePage() {
       setTestResults(result.testCaseResults);
       setExecutionStatus(result.status === 'accepted' ? 'success' : 'error');
 
+      // If accepted and user is in guided mode, complete the challenge
+      if (result.status === 'accepted' && isGuidedUser && problem) {
+        try {
+          const streakInfo = await challengeApi.completeChallenge(problem.id);
+          setStreakUpdated(true);
+          setNewStreak(streakInfo.currentStreak);
+        } catch (err) {
+          console.error('Failed to update streak:', err);
+        }
+      }
+
       // Format output
       let outputText = '';
       if (result.status === 'accepted') {
@@ -272,16 +291,43 @@ export function PracticePage() {
     );
   }
 
+  // Determine back navigation
+  const backPath = isGuidedUser ? '/guided' : '/problems';
+  const backLabel = isGuidedUser ? 'Guided Mode' : 'Problems';
+
   return (
     <div className="h-screen flex flex-col bg-slate-900">
+      {/* Streak Update Banner */}
+      {streakUpdated && newStreak !== null && (
+        <div className="bg-gradient-to-r from-orange-500/20 to-yellow-500/20 border-b border-orange-500/30 px-4 py-3 flex items-center justify-center gap-3">
+          <Flame className="w-6 h-6 text-orange-500" />
+          <span className="text-white font-medium">
+            {newStreak === 1
+              ? 'Streak started! Keep it up tomorrow!'
+              : `${newStreak} day streak! 🔥`}
+          </span>
+          <button
+            onClick={() => navigate('/guided')}
+            className="ml-4 btn btn-sm bg-orange-500 hover:bg-orange-600 text-white"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <header className="h-14 border-b border-slate-800 flex items-center px-4 flex-shrink-0">
         <button
-          onClick={() => navigate('/problems')}
+          onClick={() => navigate(backPath)}
           className="flex items-center gap-2 text-slate-400 hover:text-white mr-4"
         >
           <ArrowLeft className="w-4 h-4" />
-          <Code2 className="w-6 h-6 text-primary-500" />
+          {isGuidedUser ? (
+            <Target className="w-5 h-5 text-primary-500" />
+          ) : (
+            <Code2 className="w-6 h-6 text-primary-500" />
+          )}
+          <span className="hidden sm:inline text-sm">{backLabel}</span>
         </button>
 
         <h1 className="text-white font-medium flex-1 truncate">{problem.title}</h1>

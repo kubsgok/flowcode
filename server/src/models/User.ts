@@ -1,6 +1,28 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+// Self-assessment ratings (1-5 scale)
+export interface ISelfAssessment {
+  arrays: number;
+  strings: number;
+  hashmaps: number;
+  twoPointers: number;
+  slidingWindow: number;
+  linkedLists: number;
+  trees: number;
+  graphs: number;
+  dynamicProgramming: number;
+  recursion: number;
+}
+
+// Guided mode progress tracking
+export interface IGuidedProgress {
+  currentStreak: number;
+  longestStreak: number;
+  lastCompletedDate: Date | null;
+  totalChallengesCompleted: number;
+}
+
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
   email: string;
@@ -11,12 +33,21 @@ export interface IUser extends Document {
     editorTheme: string;
     fontSize: number;
   };
+  // Mode selection and onboarding
+  preferredMode: 'guided' | 'practice' | null;
+  onboardingComplete: boolean;
+  selfAssessment: ISelfAssessment | null;
+  // Guided mode progress
+  guidedProgress: IGuidedProgress;
   skillSummary: {
     overallLevel: number;
     weakestConcepts: string[];
     strongestConcepts: string[];
     lastActiveAt: Date;
   };
+  // Problem progress tracking
+  solvedProblems: mongoose.Types.ObjectId[];
+  attemptedProblems: mongoose.Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -50,12 +81,41 @@ const UserSchema = new Schema<IUser>(
       editorTheme: { type: String, default: 'vs-dark' },
       fontSize: { type: Number, default: 14, min: 10, max: 24 },
     },
+    // Mode selection and onboarding
+    preferredMode: {
+      type: String,
+      enum: ['guided', 'practice', null],
+      default: null,
+    },
+    onboardingComplete: { type: Boolean, default: false },
+    selfAssessment: {
+      arrays: { type: Number, min: 1, max: 5 },
+      strings: { type: Number, min: 1, max: 5 },
+      hashmaps: { type: Number, min: 1, max: 5 },
+      twoPointers: { type: Number, min: 1, max: 5 },
+      slidingWindow: { type: Number, min: 1, max: 5 },
+      linkedLists: { type: Number, min: 1, max: 5 },
+      trees: { type: Number, min: 1, max: 5 },
+      graphs: { type: Number, min: 1, max: 5 },
+      dynamicProgramming: { type: Number, min: 1, max: 5 },
+      recursion: { type: Number, min: 1, max: 5 },
+    },
+    // Guided mode progress
+    guidedProgress: {
+      currentStreak: { type: Number, default: 0 },
+      longestStreak: { type: Number, default: 0 },
+      lastCompletedDate: { type: Date, default: null },
+      totalChallengesCompleted: { type: Number, default: 0 },
+    },
     skillSummary: {
       overallLevel: { type: Number, default: 0, min: 0, max: 100 },
       weakestConcepts: [{ type: String }],
       strongestConcepts: [{ type: String }],
       lastActiveAt: { type: Date, default: Date.now },
     },
+    // Problem progress tracking
+    solvedProblems: [{ type: Schema.Types.ObjectId, ref: 'Problem' }],
+    attemptedProblems: [{ type: Schema.Types.ObjectId, ref: 'Problem' }],
   },
   {
     timestamps: true,

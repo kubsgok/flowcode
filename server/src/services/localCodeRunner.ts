@@ -21,11 +21,18 @@ function wrapPythonCode(userCode: string, input: string): string {
   const lines = input.split('\n').filter(l => l.trim());
 
   // Try to detect the function name from user code
-  const funcMatch = userCode.match(/def\s+(\w+)\s*\(/);
-  const funcName = funcMatch ? funcMatch[1] : 'solution';
+  // Skip __init__, __str__, etc. - look for the first non-dunder function
+  const allFuncs = [...userCode.matchAll(/def\s+(\w+)\s*\(/g)];
+  const nonDunderFunc = allFuncs.find(m => !m[1].startsWith('__'));
+  const funcName = nonDunderFunc ? nonDunderFunc[1] : (allFuncs[0] ? allFuncs[0][1] : 'solution');
 
-  // Check if this is a tree problem
-  const isTreeProblem = funcName === 'levelOrder' || userCode.includes('TreeNode');
+  // Check if this is a tree or linked list problem
+  const isTreeProblem = funcName === 'levelOrder' || funcName === 'maxDepth' || funcName === 'invertTree' ||
+    funcName === 'isValidBST' || funcName === 'maxPathSum' || funcName === 'lowestCommonAncestor' ||
+    userCode.includes('TreeNode');
+  const isLinkedListProblem = funcName === 'reverseList' || funcName === 'mergeTwoLists' ||
+    funcName === 'hasCycle' || funcName === 'removeNthFromEnd' || funcName === 'reorderList' ||
+    funcName === 'mergeKLists' || userCode.includes('ListNode');
 
   // Build the wrapper code
   const wrapper = `
@@ -62,6 +69,44 @@ def build_tree(values):
 
     return root
 
+# Convert tree to level-order list
+def tree_to_list(root):
+    if not root:
+        return []
+    result = []
+    queue = deque([root])
+    while queue:
+        node = queue.popleft()
+        if node:
+            result.append(node.val)
+            queue.append(node.left)
+            queue.append(node.right)
+        else:
+            result.append(None)
+    # Remove trailing Nones
+    while result and result[-1] is None:
+        result.pop()
+    return result
+
+# Build linked list from array
+def build_linked_list(values):
+    if not values:
+        return None
+    head = ListNode(values[0])
+    curr = head
+    for val in values[1:]:
+        curr.next = ListNode(val)
+        curr = curr.next
+    return head
+
+# Convert linked list to array
+def linked_list_to_array(head):
+    result = []
+    while head:
+        result.append(head.val)
+        head = head.next
+    return result
+
 # Parse inputs
 inputs = ${JSON.stringify(lines)}
 args = []
@@ -80,17 +125,79 @@ for inp in inputs:
         else:
             args.append(inp)
 
+# Find node by value in tree
+def find_node(root, val):
+    if not root:
+        return None
+    if root.val == val:
+        return root
+    left = find_node(root.left, val)
+    if left:
+        return left
+    return find_node(root.right, val)
+
 # Handle tree problems specially
 ${isTreeProblem ? `
 # Convert first arg from list to TreeNode
+tree_root = None
 if args and isinstance(args[0], list):
-    args[0] = build_tree(args[0])
+    tree_root = build_tree(args[0])
+    args[0] = tree_root
+
+# For LCA, convert p and q values to TreeNode objects
+if '${funcName}' == 'lowestCommonAncestor' and len(args) >= 3:
+    if isinstance(args[1], int):
+        args[1] = find_node(tree_root, args[1])
+    if isinstance(args[2], int):
+        args[2] = find_node(tree_root, args[2])
+` : ''}
+
+# Handle linked list problems specially
+${isLinkedListProblem ? `
+# For reorderList, keep reference to head
+original_head = None
+
+# Convert list args to ListNode
+for i, arg in enumerate(args):
+    if isinstance(arg, list):
+        # Check if it's a list of lists (like for mergeKLists)
+        if arg and isinstance(arg[0], list):
+            args[i] = [build_linked_list(inner) for inner in arg]
+        elif all(isinstance(x, int) or x is None for x in arg):
+            converted = build_linked_list(arg)
+            if i == 0:
+                original_head = converted
+            args[i] = converted
 ` : ''}
 
 # Call the function
 result = ${funcName}(*args)
 
 # Print result in expected format
+${isLinkedListProblem ? `
+# Handle in-place modification (reorderList returns None)
+if '${funcName}' == 'reorderList' and result is None and original_head is not None:
+    result = original_head
+
+# Convert linked list result back to array
+if result is not None and hasattr(result, 'val'):
+    result = linked_list_to_array(result)
+elif result is None:
+    result = []
+` : ''}
+
+${isTreeProblem ? `
+# Convert tree result back to list or extract value
+if result is not None and hasattr(result, 'val'):
+    if '${funcName}' == 'lowestCommonAncestor':
+        # Just return the node's value
+        result = result.val
+    else:
+        result = tree_to_list(result)
+elif result is None and '${funcName}' in ['invertTree']:
+    result = []
+` : ''}
+
 if isinstance(result, bool):
     print(str(result).lower())
 elif isinstance(result, list):
@@ -311,8 +418,15 @@ if (args.length > 0 && Array.isArray(args[0])) {
 }
 ` : ''}
 
-// Call the function
-const result = ${funcName}(...args);
+// Call the function with proper argument handling
+let result: any;
+switch (args.length) {
+  case 0: result = (${funcName} as any)(); break;
+  case 1: result = (${funcName} as any)(args[0]); break;
+  case 2: result = (${funcName} as any)(args[0], args[1]); break;
+  case 3: result = (${funcName} as any)(args[0], args[1], args[2]); break;
+  default: result = (${funcName} as any)(...args as [any, ...any[]]); break;
+}
 
 // Print result
 if (typeof result === 'boolean') {
@@ -327,18 +441,20 @@ if (typeof result === 'boolean') {
   fs.writeFileSync(tsFile, wrappedCode);
 
   // Compile TypeScript to JavaScript
+  // Use tsc from the monorepo root's node_modules to avoid npx issues in temp directories
+  const tscPath = path.join(__dirname, '..', '..', '..', 'node_modules', '.bin', 'tsc');
   try {
-    execSync(`npx tsc --esModuleInterop --target ES2020 --module commonjs --outDir ${tempDir} ${tsFile}`, {
-      cwd: tempDir,
+    execSync(`"${tscPath}" --skipLibCheck --esModuleInterop --target ES2020 --module commonjs --outDir "${tempDir}" "${tsFile}"`, {
       timeout: TIMEOUT_MS,
-      stdio: ['pipe', 'pipe', 'pipe']
+      encoding: 'utf-8',
     });
   } catch (compileError: unknown) {
     try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch { /* ignore */ }
-    const error = compileError as { stderr?: Buffer; message?: string };
+    const error = compileError as { stdout?: string; stderr?: string; message?: string };
+    const errorMsg = error.stdout || error.stderr || error.message || 'Unknown error';
     return {
       output: '',
-      error: `TypeScript Compilation Error: ${error.stderr?.toString() || error.message || 'Unknown error'}`,
+      error: `TypeScript Compilation Error: ${errorMsg}`,
       exitCode: 1,
       timedOut: false,
     };
@@ -541,34 +657,96 @@ ${isTreeProblem ? `
 }
 
 function getJavaMethodCall(methodName: string, returnType: string, argCount: number): string {
-  // Special handling for tree problems - use raw input string, not parsed
+  // Trees: TreeNode -> List<List<Integer>>
   if (methodName === 'levelOrder') {
     return `TreeNode root = buildTree(inputs[0]);
         List<List<Integer>> result = sol.levelOrder(root);
         printNestedList(result);`;
   }
 
-  // Special handling for known methods with specific signatures
+  // Trees: TreeNode -> int
+  if (methodName === 'maxDepth' || methodName === 'maxPathSum') {
+    return `TreeNode root = buildTree(inputs[0]);
+        int result = sol.${methodName}(root);
+        System.out.println(result);`;
+  }
+
+  // Trees: TreeNode -> boolean
+  if (methodName === 'isValidBST') {
+    return `TreeNode root = buildTree(inputs[0]);
+        boolean result = sol.${methodName}(root);
+        printResult(result);`;
+  }
+
+  // Arrays: int[] + int -> int[]
   if (methodName === 'twoSum') {
     return `Object result = sol.twoSum((int[]) parsedArgs[0], (int) parsedArgs[1]);
         printResult(result);`;
   }
 
-  if (methodName === 'maxProfit' || methodName === 'maxArea') {
+  // Arrays: int[] -> int
+  if (methodName === 'maxProfit' || methodName === 'maxArea' ||
+      methodName === 'maxSubArray' || methodName === 'trap' ||
+      methodName === 'longestConsecutive') {
     return `Object result = sol.${methodName}((int[]) parsedArgs[0]);
         printResult(result);`;
   }
 
+  // Arrays: int[] -> int[]
+  if (methodName === 'productExceptSelf') {
+    return `Object result = sol.${methodName}((int[]) parsedArgs[0]);
+        printResult(result);`;
+  }
+
+  // Arrays: int[] -> boolean
+  if (methodName === 'containsDuplicate') {
+    return `Object result = sol.${methodName}((int[]) parsedArgs[0]);
+        printResult(result);`;
+  }
+
+  // Arrays: int[] + int -> int
+  if (methodName === 'subarraySum') {
+    return `Object result = sol.${methodName}((int[]) parsedArgs[0], (int) parsedArgs[1]);
+        printResult(result);`;
+  }
+
+  // Arrays: int[] + int -> int[]
+  if (methodName === 'topKFrequent') {
+    return `Object result = sol.${methodName}((int[]) parsedArgs[0], (int) parsedArgs[1]);
+        printResult(result);`;
+  }
+
+  // Strings: String -> boolean
   if (methodName === 'isPalindrome' || methodName === 'isValid') {
     return `Object result = sol.${methodName}((String) parsedArgs[0]);
         printResult(result);`;
   }
 
-  if (methodName === 'lengthOfLongestSubstring') {
+  // Strings: String, String -> boolean
+  if (methodName === 'isAnagram' || methodName === 'canConstruct') {
+    return `Object result = sol.${methodName}((String) parsedArgs[0], (String) parsedArgs[1]);
+        printResult(result);`;
+  }
+
+  // Strings: String -> int
+  if (methodName === 'lengthOfLongestSubstring' || methodName === 'myAtoi') {
     return `Object result = sol.${methodName}((String) parsedArgs[0]);
         printResult(result);`;
   }
 
+  // Strings: String -> String
+  if (methodName === 'longestPalindrome') {
+    return `Object result = sol.${methodName}((String) parsedArgs[0]);
+        printResult(result);`;
+  }
+
+  // Strings: String, String -> String
+  if (methodName === 'minWindow') {
+    return `Object result = sol.${methodName}((String) parsedArgs[0], (String) parsedArgs[1]);
+        printResult(result);`;
+  }
+
+  // Misc: int -> int
   if (methodName === 'climbStairs') {
     return `Object result = sol.${methodName}((int) parsedArgs[0]);
         printResult(result);`;
@@ -800,43 +978,137 @@ function getCppMethodCall(methodName: string, inputLines: string[]): string {
   // Generate appropriate call based on method name
   const escapedInputs = inputLines.map(l => l.replace(/\\/g, '\\\\').replace(/"/g, '\\"'));
 
+  // Arrays: vector<int> + int -> vector<int>
   if (methodName === 'twoSum') {
     return `
     vector<int> nums = parseIntArray("${escapedInputs[0]}");
     int target = stoi("${escapedInputs[1]}");
     auto result = sol.twoSum(nums, target);
     printVector(result);`;
-  } else if (methodName === 'isPalindrome' || methodName === 'isValid') {
-    return `
-    string s = parseString("${escapedInputs[0]}");
-    bool result = sol.${methodName}(s);
-    printBool(result);`;
-  } else if (methodName === 'maxProfit' || methodName === 'maxArea') {
+  }
+
+  // Arrays: vector<int> -> int
+  if (methodName === 'maxProfit' || methodName === 'maxArea' ||
+      methodName === 'maxSubArray' || methodName === 'trap' ||
+      methodName === 'longestConsecutive') {
     return `
     vector<int> arr = parseIntArray("${escapedInputs[0]}");
     int result = sol.${methodName}(arr);
     cout << result << endl;`;
-  } else if (methodName === 'lengthOfLongestSubstring') {
+  }
+
+  // Arrays: vector<int> -> vector<int>
+  if (methodName === 'productExceptSelf') {
+    return `
+    vector<int> nums = parseIntArray("${escapedInputs[0]}");
+    auto result = sol.${methodName}(nums);
+    printVector(result);`;
+  }
+
+  // Arrays: vector<int> -> bool
+  if (methodName === 'containsDuplicate') {
+    return `
+    vector<int> nums = parseIntArray("${escapedInputs[0]}");
+    bool result = sol.${methodName}(nums);
+    printBool(result);`;
+  }
+
+  // Arrays: vector<int> + int -> int
+  if (methodName === 'subarraySum') {
+    return `
+    vector<int> nums = parseIntArray("${escapedInputs[0]}");
+    int k = stoi("${escapedInputs[1]}");
+    int result = sol.${methodName}(nums, k);
+    cout << result << endl;`;
+  }
+
+  // Arrays: vector<int> + int -> vector<int>
+  if (methodName === 'topKFrequent') {
+    return `
+    vector<int> nums = parseIntArray("${escapedInputs[0]}");
+    int k = stoi("${escapedInputs[1]}");
+    auto result = sol.${methodName}(nums, k);
+    printVector(result);`;
+  }
+
+  // Strings: string -> bool
+  if (methodName === 'isPalindrome' || methodName === 'isValid') {
+    return `
+    string s = parseString("${escapedInputs[0]}");
+    bool result = sol.${methodName}(s);
+    printBool(result);`;
+  }
+
+  // Strings: string, string -> bool
+  if (methodName === 'isAnagram' || methodName === 'canConstruct') {
+    return `
+    string s = parseString("${escapedInputs[0]}");
+    string t = parseString("${escapedInputs[1]}");
+    bool result = sol.${methodName}(s, t);
+    printBool(result);`;
+  }
+
+  // Strings: string -> int
+  if (methodName === 'lengthOfLongestSubstring' || methodName === 'myAtoi') {
     return `
     string s = parseString("${escapedInputs[0]}");
     int result = sol.${methodName}(s);
     cout << result << endl;`;
-  } else if (methodName === 'climbStairs') {
+  }
+
+  // Strings: string -> string
+  if (methodName === 'longestPalindrome') {
+    return `
+    string s = parseString("${escapedInputs[0]}");
+    string result = sol.${methodName}(s);
+    cout << result << endl;`;
+  }
+
+  // Strings: string, string -> string
+  if (methodName === 'minWindow') {
+    return `
+    string s = parseString("${escapedInputs[0]}");
+    string t = parseString("${escapedInputs[1]}");
+    string result = sol.${methodName}(s, t);
+    cout << result << endl;`;
+  }
+
+  // Misc: int -> int
+  if (methodName === 'climbStairs') {
     return `
     int n = stoi("${escapedInputs[0]}");
     int result = sol.${methodName}(n);
     cout << result << endl;`;
-  } else if (methodName === 'levelOrder') {
+  }
+
+  // Trees: TreeNode* -> vector<vector<int>>
+  if (methodName === 'levelOrder') {
     return `
     TreeNode* root = buildTree("${escapedInputs[0]}");
     auto result = sol.levelOrder(root);
     printNestedVector(result);`;
-  } else {
-    // Generic fallback
+  }
+
+  // Trees: TreeNode* -> int
+  if (methodName === 'maxDepth' || methodName === 'maxPathSum') {
     return `
+    TreeNode* root = buildTree("${escapedInputs[0]}");
+    int result = sol.${methodName}(root);
+    cout << result << endl;`;
+  }
+
+  // Trees: TreeNode* -> bool
+  if (methodName === 'isValidBST') {
+    return `
+    TreeNode* root = buildTree("${escapedInputs[0]}");
+    bool result = sol.${methodName}(root);
+    printBool(result);`;
+  }
+
+  // Generic fallback
+  return `
     // Unsupported method: ${methodName}
     cout << "Method not supported" << endl;`;
-  }
 }
 
 /**

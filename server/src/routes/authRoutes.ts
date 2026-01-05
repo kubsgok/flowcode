@@ -5,6 +5,10 @@ import {
   getMe,
   refreshToken,
   updatePreferences,
+  getProblemStatus,
+  completeOnboarding,
+  getOnboardingStatus,
+  setPreferredMode,
 } from '../controllers/authController';
 import { protect } from '../middleware/auth';
 
@@ -15,6 +19,10 @@ router.post('/login', login);
 router.post('/refresh', refreshToken);
 
 router.get('/me', protect, getMe);
+router.get('/problem-status', protect, getProblemStatus);
+router.get('/onboarding-status', protect, getOnboardingStatus);
 router.patch('/preferences', protect, updatePreferences);
+router.post('/onboarding', protect, completeOnboarding);
+router.patch('/mode', protect, setPreferredMode);
 
 export default router;

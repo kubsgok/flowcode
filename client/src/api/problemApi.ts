@@ -20,7 +20,7 @@ interface ProblemFilters {
   difficulty?: Difficulty;
   concepts?: Concept[];
   search?: string;
-  sortBy?: 'popularity' | 'successRate' | 'createdAt' | 'difficulty';
+  sortBy?: 'popularity' | 'successRate' | 'createdAt' | 'difficulty' | 'concept';
   sortOrder?: 'asc' | 'desc';
 }
 

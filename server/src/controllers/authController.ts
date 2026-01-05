@@ -115,3 +115,106 @@ export const updatePreferences = asyncHandler(
     });
   }
 );
+
+export const getProblemStatus = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.userId) {
+      throw new AppError('Not authenticated', 401);
+    }
+
+    const problemStatus = await authService.getUserProblemStatus(req.userId);
+
+    res.status(200).json({
+      success: true,
+      data: problemStatus,
+    });
+  }
+);
+
+// Self-assessment schema (1-5 ratings for each concept)
+const selfAssessmentSchema = z.object({
+  arrays: z.number().min(1).max(5),
+  strings: z.number().min(1).max(5),
+  hashmaps: z.number().min(1).max(5),
+  twoPointers: z.number().min(1).max(5),
+  slidingWindow: z.number().min(1).max(5),
+  linkedLists: z.number().min(1).max(5),
+  trees: z.number().min(1).max(5),
+  graphs: z.number().min(1).max(5),
+  dynamicProgramming: z.number().min(1).max(5),
+  recursion: z.number().min(1).max(5),
+});
+
+const onboardingSchema = z.object({
+  mode: z.enum(['guided', 'practice']),
+  selfAssessment: selfAssessmentSchema.optional(),
+});
+
+export const completeOnboarding = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.userId) {
+      throw new AppError('Not authenticated', 401);
+    }
+
+    const validatedData = onboardingSchema.parse(req.body);
+
+    // For guided mode, self-assessment is required
+    if (validatedData.mode === 'guided' && !validatedData.selfAssessment) {
+      throw new AppError('Self-assessment is required for guided mode', 400);
+    }
+
+    const user = await authService.completeOnboarding(
+      req.userId,
+      validatedData.mode,
+      validatedData.selfAssessment
+    );
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { user },
+    });
+  }
+);
+
+export const getOnboardingStatus = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.userId) {
+      throw new AppError('Not authenticated', 401);
+    }
+
+    const status = await authService.getOnboardingStatus(req.userId);
+
+    res.status(200).json({
+      success: true,
+      data: status,
+    });
+  }
+);
+
+export const setPreferredMode = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.userId) {
+      throw new AppError('Not authenticated', 401);
+    }
+
+    const modeSchema = z.object({
+      mode: z.enum(['guided', 'practice']),
+    });
+
+    const validatedData = modeSchema.parse(req.body);
+    const user = await authService.setPreferredMode(req.userId, validatedData.mode);
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { user },
+    });
+  }
+);

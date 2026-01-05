@@ -1,9 +1,11 @@
 import { Types } from 'mongoose';
 import { Submission, ISubmission } from '../models/Submission';
 import { Problem } from '../models/Problem';
+import { User } from '../models/User';
 import { judge0Service } from './judge0Service';
 import { runCodeLocally } from './localCodeRunner';
 import { problemService } from './problemService';
+import { skillService } from './skillService';
 import { AppError } from '../middleware/errorHandler';
 import { LANGUAGE_IDS } from '@flowcode/shared';
 import type { SubmissionStatus, TestCaseResult } from '@flowcode/shared';
@@ -99,6 +101,9 @@ export class SubmissionService {
 
     // Determine overall status
     const status = this.determineOverallStatus(results);
+
+    // Mark problem as attempted (if not already solved)
+    await this.markAsAttempted(userId, problemId);
 
     return {
       submissionId: '', // Not saved for run
@@ -201,6 +206,18 @@ export class SubmissionService {
 
     // Update problem success rate
     await problemService.updateSuccessRate(problemId, status === 'accepted');
+
+    // Update user's problem tracking and skills
+    const isFirstSolve = await this.updateUserProblemStatus(userId, problemId, status === 'accepted');
+
+    // Update skill profile
+    await skillService.updateSkillsAfterSubmission(
+      userId,
+      problemId,
+      status === 'accepted',
+      hintsUsed || [],
+      isFirstSolve
+    );
 
     return {
       submissionId: submission._id.toString(),
@@ -360,6 +377,60 @@ export class SubmissionService {
       .lean();
 
     return submission as unknown as ISubmission | null;
+  }
+
+  /**
+   * Update user's solved/attempted problem lists
+   * Returns true if this was the first time solving this problem
+   */
+  private async updateUserProblemStatus(
+    userId: string,
+    problemId: string,
+    solved: boolean
+  ): Promise<boolean> {
+    const problemObjectId = new Types.ObjectId(problemId);
+    const userObjectId = new Types.ObjectId(userId);
+
+    // Check if already solved
+    const user = await User.findById(userObjectId).select('solvedProblems');
+    const alreadySolved = user?.solvedProblems?.some((id) => id.equals(problemObjectId)) || false;
+
+    if (solved) {
+      // Add to solvedProblems (if not already there)
+      // Also remove from attemptedProblems since it's now solved
+      await User.findByIdAndUpdate(userObjectId, {
+        $addToSet: { solvedProblems: problemObjectId },
+        $pull: { attemptedProblems: problemObjectId },
+      });
+      return !alreadySolved; // First solve if not already solved
+    } else {
+      // Add to attemptedProblems only if not already solved
+      if (!alreadySolved) {
+        await User.findByIdAndUpdate(userObjectId, {
+          $addToSet: { attemptedProblems: problemObjectId },
+        });
+      }
+      return false;
+    }
+  }
+
+  /**
+   * Mark a problem as attempted (when user clicks "Run")
+   * Only adds to attemptedProblems if not already solved
+   */
+  private async markAsAttempted(userId: string, problemId: string): Promise<void> {
+    const problemObjectId = new Types.ObjectId(problemId);
+    const userObjectId = new Types.ObjectId(userId);
+
+    // Check if already solved - don't downgrade to attempted
+    const user = await User.findById(userObjectId).select('solvedProblems');
+    const alreadySolved = user?.solvedProblems?.some((id) => id.equals(problemObjectId)) || false;
+
+    if (!alreadySolved) {
+      await User.findByIdAndUpdate(userObjectId, {
+        $addToSet: { attemptedProblems: problemObjectId },
+      });
+    }
   }
 }
 
