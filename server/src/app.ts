@@ -24,8 +24,16 @@ const limiter = rateLimit({
   },
 });
 
+// Health check - before any middleware
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Middleware
-app.use(cors({ origin: config.cors.origin, credentials: true }));
+app.use(cors({
+  origin: config.nodeEnv === 'production' ? true : config.cors.origin,
+  credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
