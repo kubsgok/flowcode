@@ -55,6 +55,7 @@ export function PracticePage() {
   const [output, setOutput] = useState<string>('');
   const [_testResults, setTestResults] = useState<TestCaseResult[]>([]);
   const [executionStatus, setExecutionStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [showBackMenu, setShowBackMenu] = useState(false);
   const startTimeRef = useRef<number>(Date.now());
 
   useEffect(() => {
@@ -290,8 +291,6 @@ export function PracticePage() {
       </div>
     );
   }
-
-  const [showBackMenu, setShowBackMenu] = useState(false);
 
   return (
     <div className="h-screen flex flex-col bg-slate-900">
