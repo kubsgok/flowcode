@@ -291,9 +291,7 @@ export function PracticePage() {
     );
   }
 
-  // Determine back navigation
-  const backPath = isGuidedUser ? '/guided' : '/problems';
-  const backLabel = isGuidedUser ? 'Guided Mode' : 'Problems';
+  const [showBackMenu, setShowBackMenu] = useState(false);
 
   return (
     <div className="h-screen flex flex-col bg-slate-900">
@@ -317,18 +315,41 @@ export function PracticePage() {
 
       {/* Header */}
       <header className="h-14 border-b border-slate-800 flex items-center px-4 flex-shrink-0">
-        <button
-          onClick={() => navigate(backPath)}
-          className="flex items-center gap-2 text-slate-400 hover:text-white mr-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          {isGuidedUser ? (
-            <Target className="w-5 h-5 text-primary-500" />
-          ) : (
-            <Code2 className="w-6 h-6 text-primary-500" />
+        <div className="relative">
+          <button
+            onClick={() => setShowBackMenu(!showBackMenu)}
+            className="flex items-center gap-2 text-slate-400 hover:text-white mr-4"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <Code2 className="w-5 h-5 text-primary-500" />
+            <span className="hidden sm:inline text-sm">Back</span>
+          </button>
+
+          {showBackMenu && (
+            <div className="absolute top-full left-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-lg py-1 z-50 min-w-[160px]">
+              <button
+                onClick={() => {
+                  navigate('/guided');
+                  setShowBackMenu(false);
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-2"
+              >
+                <Target className="w-4 h-4 text-primary-500" />
+                Guided Mode
+              </button>
+              <button
+                onClick={() => {
+                  navigate('/problems');
+                  setShowBackMenu(false);
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-2"
+              >
+                <Code2 className="w-4 h-4 text-primary-500" />
+                All Problems
+              </button>
+            </div>
           )}
-          <span className="hidden sm:inline text-sm">{backLabel}</span>
-        </button>
+        </div>
 
         <h1 className="text-white font-medium flex-1 truncate">{problem.title}</h1>
 

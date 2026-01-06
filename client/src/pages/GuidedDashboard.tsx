@@ -9,9 +9,10 @@ import {
   List,
   LogOut,
   CheckCircle2,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { challengeApi, DailyChallenge, StreakInfo, SkillProfile } from '../api/challengeApi';
+import { challengeApi, DailyChallenge, StreakInfo, SkillProfile, RecommendedProblem } from '../api/challengeApi';
 import { Spinner } from '../components/common/Spinner';
 import { CONCEPT_LABELS } from '@flowcode/shared';
 import type { Concept } from '@flowcode/shared';
@@ -21,6 +22,7 @@ export function GuidedDashboard() {
   const [challenge, setChallenge] = useState<DailyChallenge | null>(null);
   const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
   const [skillProfile, setSkillProfile] = useState<SkillProfile | null>(null);
+  const [recommendations, setRecommendations] = useState<RecommendedProblem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -28,14 +30,16 @@ export function GuidedDashboard() {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const [challengeData, streakData, skillData] = await Promise.all([
+        const [challengeData, streakData, skillData, recsData] = await Promise.all([
           challengeApi.getDailyChallenge(),
           challengeApi.getStreakInfo(),
           challengeApi.getSkillProfile(),
+          challengeApi.getRecommendedProblems(5),
         ]);
         setChallenge(challengeData);
         setStreakInfo(streakData);
         setSkillProfile(skillData);
+        setRecommendations(recsData);
       } catch (err) {
         setError('Failed to load dashboard data');
         console.error(err);
@@ -111,6 +115,15 @@ export function GuidedDashboard() {
             </div>
 
             <div className="flex items-center gap-4">
+              {/* Streak Display */}
+              {streakInfo && streakInfo.currentStreak > 0 && (
+                <div className="flex items-center gap-1.5 bg-orange-500/10 px-3 py-1.5 rounded-full">
+                  <Flame className="w-4 h-4 text-orange-500" />
+                  <span className="text-orange-500 font-semibold text-sm">
+                    {streakInfo.currentStreak}
+                  </span>
+                </div>
+              )}
               <Link
                 to="/problems"
                 className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors"
@@ -181,21 +194,14 @@ export function GuidedDashboard() {
             {challenge ? (
               <div className="card p-6">
                 {challenge.isCompleted ? (
-                  <div className="text-center py-8">
-                    <CheckCircle2 className="w-16 h-16 text-success-500 mx-auto mb-4" />
-                    <h3 className="text-2xl font-bold text-white mb-2">
-                      Challenge Complete!
+                  <div className="text-center py-6">
+                    <CheckCircle2 className="w-12 h-12 text-success-500 mx-auto mb-3" />
+                    <h3 className="text-xl font-bold text-white mb-1">
+                      Daily Challenge Complete!
                     </h3>
-                    <p className="text-slate-400 mb-6">
-                      Great work! Come back tomorrow for a new challenge.
+                    <p className="text-slate-400 text-sm">
+                      Great work! Keep practicing with the recommended problems below.
                     </p>
-                    <Link
-                      to="/problems"
-                      className="btn btn-secondary inline-flex items-center gap-2"
-                    >
-                      Practice More Problems
-                      <ArrowRight className="w-4 h-4" />
-                    </Link>
                   </div>
                 ) : (
                   <>
@@ -245,6 +251,46 @@ export function GuidedDashboard() {
                 <p className="text-slate-400">
                   Amazing work! Check back later for new problems.
                 </p>
+              </div>
+            )}
+
+            {/* Recommended Problems */}
+            {recommendations.length > 0 && (
+              <div className="mt-8">
+                <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-yellow-500" />
+                  {challenge?.isCompleted ? 'Continue Practicing' : 'More Recommendations'}
+                </h2>
+                <div className="space-y-3">
+                  {recommendations.map((rec) => (
+                    <Link
+                      key={rec.problemId}
+                      to={`/practice/${rec.slug}`}
+                      className="card p-4 block hover:bg-slate-700/50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-white font-medium mb-1">{rec.title}</h4>
+                          <div className="flex items-center gap-2">
+                            <span className={`badge badge-${rec.difficulty} text-xs`}>
+                              {rec.difficulty.charAt(0).toUpperCase() + rec.difficulty.slice(1)}
+                            </span>
+                            {rec.concepts.slice(0, 2).map((concept) => (
+                              <span
+                                key={concept}
+                                className="text-xs text-slate-400 bg-slate-700/50 px-2 py-0.5 rounded"
+                              >
+                                {CONCEPT_LABELS[concept] || concept}
+                              </span>
+                            ))}
+                          </div>
+                          <p className="text-slate-400 text-xs mt-1">{rec.reason}</p>
+                        </div>
+                        <ArrowRight className="w-5 h-5 text-slate-500" />
+                      </div>
+                    </Link>
+                  ))}
+                </div>
               </div>
             )}
           </div>

@@ -412,9 +412,26 @@ function buildTree(values: (number | null)[]): TreeNode | null {
   return root;
 }
 
+// Find a node by value in the tree
+function findNode(root: TreeNode | null, val: number): TreeNode | null {
+  if (!root) return null;
+  if (root.val === val) return root;
+  return findNode(root.left, val) || findNode(root.right, val);
+}
+
 // Convert first arg to tree if needed
 if (args.length > 0 && Array.isArray(args[0])) {
   args[0] = buildTree(args[0]);
+}
+
+// For LCA, convert p and q values to TreeNode objects
+if ('${funcName}' === 'lowestCommonAncestor' && args.length >= 3) {
+  if (typeof args[1] === 'number') {
+    args[1] = findNode(args[0], args[1]);
+  }
+  if (typeof args[2] === 'number') {
+    args[2] = findNode(args[0], args[2]);
+  }
 }
 ` : ''}
 
@@ -431,6 +448,9 @@ switch (args.length) {
 // Print result
 if (typeof result === 'boolean') {
   console.log(result.toString().toLowerCase());
+} else if (result && typeof result === 'object' && 'val' in result) {
+  // TreeNode result - print just the value
+  console.log(result.val);
 } else if (Array.isArray(result)) {
   console.log(JSON.stringify(result).replace(/ /g, ''));
 } else {
@@ -963,6 +983,15 @@ void printNestedVector(const vector<vector<int>>& v) {
     }
     cout << "]" << endl;
 }
+
+// Find a node by value in the tree
+TreeNode* findNode(TreeNode* root, int val) {
+    if (!root) return nullptr;
+    if (root->val == val) return root;
+    TreeNode* left = findNode(root->left, val);
+    if (left) return left;
+    return findNode(root->right, val);
+}
 ` : ''}
 
 int main() {
@@ -1103,6 +1132,18 @@ function getCppMethodCall(methodName: string, inputLines: string[]): string {
     TreeNode* root = buildTree("${escapedInputs[0]}");
     bool result = sol.${methodName}(root);
     printBool(result);`;
+  }
+
+  // Trees: LCA - TreeNode*, TreeNode*, TreeNode* -> TreeNode*
+  if (methodName === 'lowestCommonAncestor') {
+    return `
+    TreeNode* root = buildTree("${escapedInputs[0]}");
+    int pVal = ${escapedInputs[1] || '0'};
+    int qVal = ${escapedInputs[2] || '0'};
+    TreeNode* p = findNode(root, pVal);
+    TreeNode* q = findNode(root, qVal);
+    TreeNode* result = sol.${methodName}(root, p, q);
+    cout << (result ? result->val : -1) << endl;`;
   }
 
   // Generic fallback

@@ -17,7 +17,9 @@ import {
   XCircle,
   ArrowUpDown,
   Target,
+  Flame,
 } from 'lucide-react';
+import { challengeApi, StreakInfo } from '../api/challengeApi';
 import type { ProblemSummary, Difficulty, Concept } from '@flowcode/shared';
 import { CONCEPT_LABELS } from '@flowcode/shared';
 
@@ -49,6 +51,7 @@ export function ProblemListPage() {
     solved: Set<string>;
     attempted: Set<string>;
   }>({ solved: new Set(), attempted: new Set() });
+  const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
 
   // Filters from URL
   const page = parseInt(searchParams.get('page') || '1', 10);
@@ -65,11 +68,15 @@ export function ProblemListPage() {
   // Fetch problem statuses on mount and when navigating back to this page
   const fetchStatuses = useCallback(async () => {
     try {
-      const statuses = await authApi.getProblemStatus();
+      const [statuses, streak] = await Promise.all([
+        authApi.getProblemStatus(),
+        challengeApi.getStreakInfo().catch(() => null),
+      ]);
       setProblemStatuses({
         solved: new Set(statuses.solved),
         attempted: new Set(statuses.attempted),
       });
+      if (streak) setStreakInfo(streak);
     } catch (err) {
       console.error('Failed to fetch problem statuses:', err);
     }
@@ -190,6 +197,15 @@ export function ProblemListPage() {
             </div>
 
             <div className="flex items-center gap-4">
+              {/* Streak Display */}
+              {streakInfo && streakInfo.currentStreak > 0 && (
+                <div className="flex items-center gap-1.5 bg-orange-500/10 px-3 py-1.5 rounded-full">
+                  <Flame className="w-4 h-4 text-orange-500" />
+                  <span className="text-orange-500 font-semibold text-sm">
+                    {streakInfo.currentStreak}
+                  </span>
+                </div>
+              )}
               {user?.preferredMode === 'guided' && (
                 <Link
                   to="/guided"
