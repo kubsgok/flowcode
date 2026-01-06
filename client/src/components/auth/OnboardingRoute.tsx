@@ -5,13 +5,15 @@ import { Spinner } from '../common/Spinner';
 
 interface OnboardingRouteProps {
   children: ReactNode;
+  requireGuidedMode?: boolean;
 }
 
 /**
  * Route wrapper that requires authentication AND completed onboarding.
  * Redirects to /onboarding if the user hasn't completed the onboarding flow.
+ * If requireGuidedMode is true, also checks that user has completed guided mode onboarding.
  */
-export function OnboardingRoute({ children }: OnboardingRouteProps) {
+export function OnboardingRoute({ children, requireGuidedMode = false }: OnboardingRouteProps) {
   const { user, isLoading, isAuthenticated } = useAuth();
   const location = useLocation();
 
@@ -35,6 +37,15 @@ export function OnboardingRoute({ children }: OnboardingRouteProps) {
   if (!onboardingComplete) {
     // Onboarding not complete - redirect to onboarding
     return <Navigate to="/onboarding" replace />;
+  }
+
+  // For guided mode routes, check if user has completed guided mode setup
+  if (requireGuidedMode) {
+    const hasGuidedSetup = user?.preferredMode === 'guided' && user?.selfAssessment;
+    if (!hasGuidedSetup) {
+      // Redirect to onboarding to complete guided mode setup
+      return <Navigate to="/onboarding" state={{ switchToGuided: true }} replace />;
+    }
   }
 
   return <>{children}</>;

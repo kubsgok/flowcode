@@ -54,8 +54,38 @@ api.interceptors.response.use(
       }
     }
 
-    return Promise.reject(error);
+    // Extract user-friendly error message from response
+    const errorMessage =
+      error.response?.data?.error?.message ||
+      error.response?.data?.message ||
+      getErrorMessage(error.response?.status) ||
+      'Something went wrong. Please try again.';
+
+    const customError = new Error(errorMessage);
+    return Promise.reject(customError);
   }
 );
+
+// Helper to get user-friendly error messages based on status code
+function getErrorMessage(status?: number): string | null {
+  switch (status) {
+    case 400:
+      return 'Invalid request. Please check your input.';
+    case 401:
+      return 'Invalid email or password.';
+    case 403:
+      return 'You do not have permission to perform this action.';
+    case 404:
+      return 'The requested resource was not found.';
+    case 409:
+      return 'This email is already registered.';
+    case 429:
+      return 'Too many requests. Please wait a moment and try again.';
+    case 500:
+      return 'Server error. Please try again later.';
+    default:
+      return null;
+  }
+}
 
 export default api;

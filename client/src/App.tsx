@@ -37,11 +37,11 @@ function App() {
           }
         />
 
-        {/* Guided mode dashboard - requires completed onboarding */}
+        {/* Guided mode dashboard - requires completed onboarding AND guided mode setup */}
         <Route
           path="/guided"
           element={
-            <OnboardingRoute>
+            <OnboardingRoute requireGuidedMode={true}>
               <GuidedDashboard />
             </OnboardingRoute>
           }

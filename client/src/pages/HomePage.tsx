@@ -65,7 +65,7 @@ export function HomePage() {
         <div className="max-w-4xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-white mb-6">
             Master Coding with{' '}
-            <span className="text-primary-500">AI-Powered</span> Practice
+            <span className="text-primary-500">Guided</span> Practice
           </h1>
           <p className="text-xl text-slate-400 mb-8 max-w-2xl mx-auto">
             An adaptive platform that personalizes your learning journey.
