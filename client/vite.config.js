@@ -8,6 +8,14 @@ export default defineConfig({
             '@': path.resolve(__dirname, './src'),
         },
     },
+    optimizeDeps: {
+        include: ['@flowcode/shared'],
+    },
+    build: {
+        commonjsOptions: {
+            include: [/shared/, /node_modules/],
+        },
+    },
     server: {
         port: 3000,
         host: '127.0.0.1',
