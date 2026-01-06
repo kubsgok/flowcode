@@ -2,7 +2,7 @@ services:
   - type: web
     name: flowcode
     runtime: node
-    buildCommand: npm ci && npm run build --workspace=shared && npm run build --workspace=client && npm run build --workspace=server
+    buildCommand: npm ci --include=dev && npm run build --workspace=shared && npm run build --workspace=client && npm run build --workspace=server
     startCommand: npm run start --workspace=server
     envVars:
       - key: NODE_ENV
