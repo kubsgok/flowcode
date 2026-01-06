@@ -1,7 +1,10 @@
 {
   "name": "@flowcode/shared",
   "version": "1.0.0",
-  "main": "index.ts",
-  "types": "index.ts",
-  "scripts": {}
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  }
 }
