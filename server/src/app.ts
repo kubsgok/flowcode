@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
 
 import { config } from './config/env';
 import { connectDatabase } from './config/database';
@@ -37,7 +38,18 @@ app.use('/api', limiter);
 // Routes
 app.use('/api', routes);
 
-// Error handling
+// Serve static files in production
+if (config.nodeEnv === 'production') {
+  const clientDistPath = path.join(__dirname, '../../client/dist');
+  app.use(express.static(clientDistPath));
+
+  // Handle client-side routing - serve index.html for all non-API routes
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+}
+
+// Error handling (only for API routes in production)
 app.use(notFoundHandler);
 app.use(errorHandler);
 
