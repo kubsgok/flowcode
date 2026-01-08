@@ -206,15 +206,13 @@ export function ProblemListPage() {
                   </span>
                 </div>
               )}
-              {user?.preferredMode === 'guided' && (
-                <Link
-                  to="/guided"
-                  className="flex items-center gap-1.5 text-primary-400 hover:text-primary-300 transition-colors"
-                >
-                  <Target className="w-4 h-4" />
-                  <span className="hidden sm:inline">Guided Mode</span>
-                </Link>
-              )}
+              <Link
+                to="/guided"
+                className="flex items-center gap-1.5 text-primary-400 hover:text-primary-300 transition-colors"
+              >
+                <Target className="w-4 h-4" />
+                <span className="hidden sm:inline">Guided Mode</span>
+              </Link>
               <span className="text-slate-300">{user?.displayName}</span>
               <button
                 onClick={logout}

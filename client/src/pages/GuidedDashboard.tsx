@@ -176,7 +176,7 @@ export function GuidedDashboard() {
               <div className="text-right">
                 <div className="text-sm text-slate-500">Best Streak</div>
                 <div className="text-xl font-semibold text-white">
-                  {streakInfo?.longestStreak || 0} days
+                  {streakInfo?.longestStreak || 0} day{streakInfo?.longestStreak !== 1 ? 's' : ''}
                 </div>
               </div>
             </div>

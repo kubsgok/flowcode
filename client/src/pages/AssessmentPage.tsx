@@ -64,11 +64,11 @@ const CONCEPTS: ConceptRating[] = [
 ];
 
 const RATING_LABELS = [
-  { value: 1, label: 'Never heard of it', emoji: '🤔' },
-  { value: 2, label: 'Heard of it, never used', emoji: '👀' },
-  { value: 3, label: 'Used it a few times', emoji: '👍' },
-  { value: 4, label: 'Pretty comfortable', emoji: '💪' },
-  { value: 5, label: 'Could teach this', emoji: '🚀' },
+  { value: 1, label: 'No experience' },
+  { value: 2, label: 'Aware, no hands-on experience' },
+  { value: 3, label: 'Limited experience' },
+  { value: 4, label: 'Comfortable' },
+  { value: 5, label: 'Advanced / Expert' },
 ];
 
 export function AssessmentPage() {
@@ -129,7 +129,7 @@ export function AssessmentPage() {
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-slate-300">{concept.label}</span>
                       <span className="text-slate-500">
-                        {RATING_LABELS[rating - 1].emoji} {RATING_LABELS[rating - 1].label}
+                        {RATING_LABELS[rating - 1].label}
                       </span>
                     </div>
                     <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
@@ -218,9 +218,7 @@ export function AssessmentPage() {
                         : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
-                    <span>{option.emoji}</span>
-                    <span className="hidden sm:inline">{option.label}</span>
-                    <span className="sm:hidden">{option.value}</span>
+                    <span>{option.label}</span>
                   </button>
                 ))}
               </div>
