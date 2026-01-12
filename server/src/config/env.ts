@@ -32,4 +32,10 @@ export const config = {
   cors: {
     origin: process.env.CORS_ORIGIN || 'http://127.0.0.1:3000',
   },
+
+  openai: {
+    apiKey: process.env.OPENAI_API_KEY || '',
+    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    maxTokens: parseInt(process.env.OPENAI_MAX_TOKENS || '500', 10),
+  },
 };

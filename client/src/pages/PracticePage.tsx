@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { problemApi } from '../api/problemApi';
 import { submissionApi } from '../api/submissionApi';
 import { challengeApi } from '../api/challengeApi';
+import { aiApi } from '../api/aiApi';
 import { SplitPane } from '../components/layout/SplitPane';
 import { Spinner } from '../components/common/Spinner';
 import Editor from '@monaco-editor/react';
@@ -22,6 +23,7 @@ import {
   CheckCircle,
   XCircle,
   Flame,
+  Sparkles,
 } from 'lucide-react';
 import type { Problem, TestCaseResult } from '@flowcode/shared';
 import { SUPPORTED_LANGUAGES } from '@flowcode/shared';
@@ -55,6 +57,19 @@ export function PracticePage() {
   const [_testResults, setTestResults] = useState<TestCaseResult[]>([]);
   const [executionStatus, setExecutionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const startTimeRef = useRef<number>(Date.now());
+
+  // AI Hint state
+  const [hasRun, setHasRun] = useState(false);
+  const [aiHintContent, setAIHintContent] = useState<string | null>(null);
+  const [isLoadingAIHint, setIsLoadingAIHint] = useState(false);
+  const [aiHintError, setAIHintError] = useState<string | null>(null);
+  const [lastExecutionResult, setLastExecutionResult] = useState<{
+    status: string;
+    testCaseResults: TestCaseResult[];
+    passedTestCases: number;
+    totalTestCases: number;
+    error?: string;
+  } | null>(null);
 
   useEffect(() => {
     const fetchProblem = async () => {
@@ -139,6 +154,33 @@ export function PracticePage() {
     }
   };
 
+  const handleGetAIHint = async () => {
+    if (!problem || !hasRun || !lastExecutionResult) return;
+
+    setIsLoadingAIHint(true);
+    setAIHintError(null);
+
+    try {
+      const response = await aiApi.getAIHint({
+        problemId: problem.id,
+        code,
+        language,
+        executionResult: lastExecutionResult,
+      });
+
+      setAIHintContent(response.hint);
+      // Track AI hint as level 4 for skill penalty
+      if (!unlockedHints.includes(4)) {
+        setUnlockedHints([...unlockedHints, 4]);
+      }
+    } catch (err) {
+      console.error('Failed to get AI hint:', err);
+      setAIHintError('Failed to generate AI hint. Please try again.');
+    } finally {
+      setIsLoadingAIHint(false);
+    }
+  };
+
   const handleRun = async () => {
     if (!problem) return;
 
@@ -156,6 +198,14 @@ export function PracticePage() {
 
       setTestResults(result.testCaseResults);
       setExecutionStatus(result.status === 'accepted' ? 'success' : 'error');
+      setHasRun(true);
+      setLastExecutionResult({
+        status: result.status,
+        testCaseResults: result.testCaseResults,
+        passedTestCases: result.passedTestCases,
+        totalTestCases: result.totalTestCases,
+        error: result.error,
+      });
 
       // Format output
       let outputText = `Status: ${result.status.toUpperCase()}\n`;
@@ -340,6 +390,11 @@ export function PracticePage() {
               hintContents={hintContents}
               onUnlockHint={handleUnlockHint}
               isLoadingHint={isLoadingHint}
+              hasRun={hasRun}
+              aiHintContent={aiHintContent}
+              isLoadingAIHint={isLoadingAIHint}
+              aiHintError={aiHintError}
+              onGetAIHint={handleGetAIHint}
             />
           }
           rightPanel={
@@ -372,6 +427,11 @@ function LeftPanel({
   hintContents,
   onUnlockHint,
   isLoadingHint,
+  hasRun,
+  aiHintContent,
+  isLoadingAIHint,
+  aiHintError,
+  onGetAIHint,
 }: {
   problem: Problem;
   activeTab: 'description' | 'hints';
@@ -380,6 +440,11 @@ function LeftPanel({
   hintContents: Record<number, string>;
   onUnlockHint: (level: 1 | 2 | 3) => void;
   isLoadingHint: boolean;
+  hasRun: boolean;
+  aiHintContent: string | null;
+  isLoadingAIHint: boolean;
+  aiHintError: string | null;
+  onGetAIHint: () => void;
 }) {
   return (
     <div className="h-full flex flex-col bg-slate-800">
@@ -471,6 +536,16 @@ function LeftPanel({
                 canUnlock={level === 1 || unlockedHints.includes(level - 1)}
               />
             ))}
+
+            {/* AI Hint Card */}
+            <AIHintCard
+              hasRun={hasRun}
+              isUnlocked={unlockedHints.includes(4)}
+              content={aiHintContent}
+              onGetHint={onGetAIHint}
+              isLoading={isLoadingAIHint}
+              error={aiHintError}
+            />
           </div>
         )}
       </div>
@@ -540,6 +615,69 @@ function HintCard({
               <>
                 <ChevronRight className="w-4 h-4 mr-1" />
                 Reveal Hint
+              </>
+            )}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// AI Hint Card Component
+function AIHintCard({
+  hasRun,
+  isUnlocked,
+  content,
+  onGetHint,
+  isLoading,
+  error,
+}: {
+  hasRun: boolean;
+  isUnlocked: boolean;
+  content: string | null;
+  onGetHint: () => void;
+  isLoading: boolean;
+  error: string | null;
+}) {
+  return (
+    <div className="card p-4 border-2 border-primary-500/30 bg-slate-800/50">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-primary-500" />
+          <span className="font-medium text-white">AI-Powered Hint</span>
+          <span className="text-xs bg-primary-500/20 text-primary-400 px-2 py-0.5 rounded-full">
+            Personalized
+          </span>
+        </div>
+      </div>
+
+      {isUnlocked && content ? (
+        <div className="text-slate-300 text-sm">
+          <ReactMarkdown>{content}</ReactMarkdown>
+        </div>
+      ) : (
+        <div>
+          <p className="text-slate-400 text-sm mb-3">
+            {hasRun
+              ? 'Get a personalized hint based on your code and test results. Using hints may affect your skill score.'
+              : 'Run your code first to unlock AI-powered hints.'}
+          </p>
+          {error && <p className="text-danger-500 text-sm mb-2">{error}</p>}
+          <button
+            onClick={onGetHint}
+            disabled={!hasRun || isLoading}
+            className="btn btn-primary text-sm"
+          >
+            {isLoading ? (
+              <>
+                <Spinner size="sm" className="mr-2" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-1" />
+                Get AI Hint
               </>
             )}
           </button>
