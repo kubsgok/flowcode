@@ -454,7 +454,7 @@ function ProblemRow({
   return (
     <Link
       to={`/practice/${problem.slug}`}
-      className="card p-4 flex items-center justify-between hover:bg-slate-750 transition-colors block"
+      className="card p-4 flex items-center justify-between transition-all duration-200 hover:bg-slate-700/50 hover:border-primary-500/30 hover:translate-x-1 hover:shadow-md block"
     >
       <div className="flex items-center gap-4">
         {/* Status Icon */}

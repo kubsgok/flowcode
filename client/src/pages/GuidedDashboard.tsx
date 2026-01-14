@@ -266,7 +266,7 @@ export function GuidedDashboard() {
                     <Link
                       key={rec.problemId}
                       to={`/practice/${rec.slug}`}
-                      className="card p-4 block hover:bg-slate-700/50 transition-colors"
+                      className="card p-4 block transition-all duration-200 hover:bg-slate-700/50 hover:border-primary-500/30 hover:translate-x-1 hover:shadow-md"
                     >
                       <div className="flex items-center justify-between">
                         <div>
