@@ -15,6 +15,11 @@ interface DailyChallenge {
   isCompleted: boolean;
 }
 
+interface ChallengeCompletionResult extends StreakInfo {
+  isDailyChallenge: boolean;
+  streakChanged: boolean;
+}
+
 interface StreakInfo {
   currentStreak: number;
   longestStreak: number;
@@ -27,18 +32,46 @@ export class ChallengeService {
   /**
    * Get the daily challenge for a user
    * This uses the recommendation algorithm to pick an appropriate problem
+   * The daily challenge is assigned once per day and stored in the user's progress
    */
   async getDailyChallenge(userId: string): Promise<DailyChallenge | null> {
-    // Check if user already completed today's challenge
     const user = await User.findById(userId).select('guidedProgress solvedProblems');
     const completedToday = this.isCompletedToday(user?.guidedProgress?.lastCompletedDate);
+    const progress = user?.guidedProgress;
 
-    // Get a recommended problem
+    // Check if we already have a daily challenge assigned for today
+    const today = new Date();
+    const hasExistingChallenge = progress?.dailyChallengeDate &&
+      this.isSameDay(progress.dailyChallengeDate, today) &&
+      progress?.dailyChallengeProblemId;
+
+    if (hasExistingChallenge && progress?.dailyChallengeProblemId) {
+      // Return the already assigned challenge
+      const recommendation = await recommendationService.getRecommendedProblemById(
+        userId,
+        progress.dailyChallengeProblemId.toString()
+      );
+
+      if (recommendation) {
+        return {
+          ...recommendation,
+          isCompleted: completedToday,
+        };
+      }
+    }
+
+    // Get a new recommended problem for today
     const recommendation = await recommendationService.getRecommendedProblem(userId);
 
     if (!recommendation) {
       return null;
     }
+
+    // Store this as today's daily challenge
+    await User.findByIdAndUpdate(userId, {
+      'guidedProgress.dailyChallengeProblemId': new Types.ObjectId(recommendation.problemId),
+      'guidedProgress.dailyChallengeDate': today,
+    });
 
     return {
       ...recommendation,
@@ -47,10 +80,23 @@ export class ChallengeService {
   }
 
   /**
-   * Complete a challenge (called when user solves the daily problem)
-   * Updates streak and guided progress
+   * Check if two dates are the same day
    */
-  async completeChallenge(userId: string, problemId: string): Promise<StreakInfo> {
+  private isSameDay(date1: Date, date2: Date): boolean {
+    const d1 = new Date(date1);
+    const d2 = new Date(date2);
+    return (
+      d1.getFullYear() === d2.getFullYear() &&
+      d1.getMonth() === d2.getMonth() &&
+      d1.getDate() === d2.getDate()
+    );
+  }
+
+  /**
+   * Complete a challenge (called when user solves a problem)
+   * Only updates streak if the problem is the current daily challenge
+   */
+  async completeChallenge(userId: string, problemId: string): Promise<ChallengeCompletionResult> {
     const user = await User.findById(userId).select('guidedProgress');
     if (!user) {
       throw new Error('User not found');
@@ -62,12 +108,35 @@ export class ChallengeService {
       longestStreak: 0,
       lastCompletedDate: null,
       totalChallengesCompleted: 0,
+      dailyChallengeProblemId: null,
+      dailyChallengeDate: null,
     };
+
+    // Check if this is the daily challenge
+    const isDailyChallenge = progress.dailyChallengeProblemId &&
+      progress.dailyChallengeDate &&
+      this.isSameDay(progress.dailyChallengeDate, now) &&
+      progress.dailyChallengeProblemId.toString() === problemId;
+
+    // If not the daily challenge, just return current streak info without updating
+    if (!isDailyChallenge) {
+      const streakInfo = await this.getStreakInfo(progress);
+      return {
+        ...streakInfo,
+        isDailyChallenge: false,
+        streakChanged: false,
+      };
+    }
 
     // Check if already completed today
     if (this.isCompletedToday(progress.lastCompletedDate)) {
       // Already completed today - return current streak info
-      return this.getStreakInfo(progress);
+      const streakInfo = await this.getStreakInfo(progress);
+      return {
+        ...streakInfo,
+        isDailyChallenge: true,
+        streakChanged: false,
+      };
     }
 
     // Calculate new streak
@@ -91,13 +160,20 @@ export class ChallengeService {
       longestStreak: Math.max(progress.longestStreak, newStreak),
       lastCompletedDate: now,
       totalChallengesCompleted: progress.totalChallengesCompleted + 1,
+      dailyChallengeProblemId: progress.dailyChallengeProblemId,
+      dailyChallengeDate: progress.dailyChallengeDate,
     };
 
     await User.findByIdAndUpdate(userId, {
       guidedProgress: updatedProgress,
     });
 
-    return this.getStreakInfo(updatedProgress);
+    const streakInfo = await this.getStreakInfo(updatedProgress);
+    return {
+      ...streakInfo,
+      isDailyChallenge: true,
+      streakChanged: true,
+    };
   }
 
   /**

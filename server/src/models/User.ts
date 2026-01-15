@@ -21,6 +21,9 @@ export interface IGuidedProgress {
   longestStreak: number;
   lastCompletedDate: Date | null;
   totalChallengesCompleted: number;
+  // Track the current daily challenge
+  dailyChallengeProblemId: mongoose.Types.ObjectId | null;
+  dailyChallengeDate: Date | null;
 }
 
 export interface IUser extends Document {
@@ -106,6 +109,8 @@ const UserSchema = new Schema<IUser>(
       longestStreak: { type: Number, default: 0 },
       lastCompletedDate: { type: Date, default: null },
       totalChallengesCompleted: { type: Number, default: 0 },
+      dailyChallengeProblemId: { type: Schema.Types.ObjectId, ref: 'Problem', default: null },
+      dailyChallengeDate: { type: Date, default: null },
     },
     skillSummary: {
       overallLevel: { type: Number, default: 0, min: 0, max: 100 },

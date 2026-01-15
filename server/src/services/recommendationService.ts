@@ -298,6 +298,39 @@ export class RecommendationService {
 
     return labels[concept] || concept;
   }
+
+  /**
+   * Get a specific problem by ID formatted as a RecommendedProblem
+   * Used for retrieving an already-assigned daily challenge
+   */
+  async getRecommendedProblemById(
+    userId: string,
+    problemId: string
+  ): Promise<RecommendedProblem | null> {
+    const problem = await Problem.findById(problemId).lean();
+    if (!problem) return null;
+
+    // Get user's skill profile for the reason
+    const profile = await skillService.getSkillProfile(userId);
+    const concept = problem.concepts[0] as Concept;
+    let skillScore = 0;
+
+    if (profile?.conceptScores) {
+      const conceptData = profile.conceptScores.get(concept);
+      skillScore = conceptData?.score || 0;
+    }
+
+    return {
+      problemId: problem._id.toString(),
+      slug: problem.slug,
+      title: problem.title,
+      difficulty: problem.difficulty,
+      concepts: problem.concepts as Concept[],
+      reason: this.generateReason(concept, skillScore, problem.difficulty),
+      targetConcept: concept,
+      skillScore,
+    };
+  }
 }
 
 export const recommendationService = new RecommendationService();

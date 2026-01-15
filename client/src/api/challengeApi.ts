@@ -26,6 +26,11 @@ export interface StreakInfo {
   streakStatus: 'active' | 'at_risk' | 'broken';
 }
 
+export interface ChallengeCompletionResult extends StreakInfo {
+  isDailyChallenge: boolean;
+  streakChanged: boolean;
+}
+
 export interface RecommendedProblem {
   problemId: string;
   slug: string;
@@ -52,8 +57,8 @@ export const challengeApi = {
     return response.data.data.challenge;
   },
 
-  completeChallenge: async (problemId: string): Promise<StreakInfo> => {
-    const response = await api.post<ApiResponse<{ streakInfo: StreakInfo }>>(
+  completeChallenge: async (problemId: string): Promise<ChallengeCompletionResult> => {
+    const response = await api.post<ApiResponse<{ streakInfo: ChallengeCompletionResult }>>(
       '/challenges/complete',
       { problemId }
     );

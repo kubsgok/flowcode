@@ -267,9 +267,12 @@ export function PracticePage() {
       // If accepted and user is in guided mode, complete the challenge
       if (result.status === 'accepted' && isGuidedUser && problem) {
         try {
-          const streakInfo = await challengeApi.completeChallenge(problem.id);
-          setStreakUpdated(true);
-          setNewStreak(streakInfo.currentStreak);
+          const completionResult = await challengeApi.completeChallenge(problem.id);
+          // Only show streak banner if this was the daily challenge AND streak changed
+          if (completionResult.isDailyChallenge && completionResult.streakChanged) {
+            setStreakUpdated(true);
+            setNewStreak(completionResult.currentStreak);
+          }
         } catch (err) {
           console.error('Failed to update streak:', err);
         }
