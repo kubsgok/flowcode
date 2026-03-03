@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { Problem } from '../models/Problem';
 import { config } from '../config/env';
 
-const problems = [
+export const problems = [
   // ============================================
   // ARRAYS (6 problems: 2 easy, 2 medium, 2 hard)
   // ============================================
@@ -37,9 +37,9 @@ You can return the answer in any order.`,
       { input: '[1,2,3,4,5,6,7,8,9,10]\n19', expectedOutput: '[8,9]', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Think about what value you need to find for each element to reach the target.' },
-      { level: 2, content: 'Use a hash map to store numbers you\'ve seen.' },
-      { level: 3, content: 'For each element, check if (target - num) exists in your map. If yes, return indices.' },
+      { level: 1, content: 'For each number, you need to find if its "complement" (target - number) exists in the array. What data structure gives O(1) lookup?' },
+      { level: 2, content: 'Use a hash map where keys are numbers and values are their indices. As you iterate, check if the complement exists before adding the current number.' },
+      { level: 3, content: 'Algorithm:\n1. Create empty hash map\n2. For i in range(len(nums)):\n   - complement = target - nums[i]\n   - If complement in map: return [map[complement], i]\n   - map[nums[i]] = i\n3. Return [] (no solution found)' },
     ],
     starterCode: new Map([
       ['python', 'def twoSum(nums: list[int], target: int) -> list[int]:\n    # Your code here\n    pass'],
@@ -82,9 +82,9 @@ Return the maximum profit you can achieve from this transaction. If you cannot a
       { input: '[5,4,3,2,1,10]', expectedOutput: '9', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Track the minimum price seen so far.' },
-      { level: 2, content: 'For each price, calculate profit if sold today (current - minimum).' },
-      { level: 3, content: 'One pass: track minPrice and maxProfit. Update both as you iterate.' },
+      { level: 1, content: 'You must buy before you sell. As you scan left to right, what\'s the best buy price you\'ve seen so far?' },
+      { level: 2, content: 'Track two things: the minimum price seen so far (best buy), and the maximum profit achievable. For each day, update both.' },
+      { level: 3, content: 'Algorithm:\n1. minPrice = infinity, maxProfit = 0\n2. For each price in prices:\n   - minPrice = min(minPrice, price)\n   - profit = price - minPrice\n   - maxProfit = max(maxProfit, profit)\n3. Return maxProfit' },
     ],
     starterCode: new Map([
       ['python', 'def maxProfit(prices: list[int]) -> int:\n    # Your code here\n    pass'],
@@ -128,9 +128,9 @@ Return the maximum amount of water a container can store.`,
       { input: '[5,5,5,5,5,5]', expectedOutput: '25', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Use two pointers at the ends of the array.' },
-      { level: 2, content: 'Area = min(height[left], height[right]) * (right - left).' },
-      { level: 3, content: 'Move the pointer with smaller height inward to potentially find larger area.' },
+      { level: 1, content: 'Area is limited by the shorter line. The width is the distance between lines. How can you efficiently check all pairs?' },
+      { level: 2, content: 'Start with widest container (pointers at both ends). Moving inward decreases width, so only move the shorter side hoping to find a taller line.' },
+      { level: 3, content: 'Algorithm:\n1. left = 0, right = len-1, maxArea = 0\n2. While left < right:\n   - area = min(height[left], height[right]) * (right - left)\n   - maxArea = max(maxArea, area)\n   - If height[left] < height[right]: left++\n   - Else: right--\n3. Return maxArea' },
     ],
     starterCode: new Map([
       ['python', 'def maxArea(height: list[int]) -> int:\n    # Your code here\n    pass'],
@@ -174,9 +174,9 @@ You must write an algorithm that runs in O(n) time and **without using the divis
       { input: '[-2,1,-1,2]', expectedOutput: '[-2,4,-4,2]', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Think about prefix and suffix products.' },
-      { level: 2, content: 'For each position, you need product of all elements to the left AND all elements to the right.' },
-      { level: 3, content: 'First pass: compute prefix products. Second pass: multiply by suffix products from right to left.' },
+      { level: 1, content: 'Without division, you need another way. For each index, the answer is (product of everything left) × (product of everything right).' },
+      { level: 2, content: 'Use two passes: first build prefix products left-to-right, then multiply by suffix products right-to-left. This avoids using extra arrays.' },
+      { level: 3, content: 'Algorithm:\n1. result = [1] * n, prefix = 1\n2. For i in 0 to n-1:\n   - result[i] = prefix\n   - prefix *= nums[i]\n3. suffix = 1\n4. For i in n-1 to 0:\n   - result[i] *= suffix\n   - suffix *= nums[i]\n5. Return result' },
     ],
     starterCode: new Map([
       ['python', 'def productExceptSelf(nums: list[int]) -> list[int]:\n    # Your code here\n    pass'],
@@ -218,9 +218,9 @@ A **subarray** is a contiguous non-empty sequence of elements within an array.`,
       { input: '[-1,0,-2]', expectedOutput: '0', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Consider Kadane\'s algorithm.' },
-      { level: 2, content: 'At each position, decide: start fresh or extend previous subarray?' },
-      { level: 3, content: 'Track currentMax (max ending here) and globalMax. currentMax = max(num, currentMax + num).' },
+      { level: 1, content: 'At each position, you have a choice: start a new subarray here, or extend the previous subarray. Which gives a larger sum?' },
+      { level: 2, content: 'Kadane\'s algorithm: track "max sum ending at current position" and "global max". If previous sum is negative, start fresh.' },
+      { level: 3, content: 'Algorithm:\n1. currentSum = nums[0], maxSum = nums[0]\n2. For i in 1 to n-1:\n   - currentSum = max(nums[i], currentSum + nums[i])\n   - maxSum = max(maxSum, currentSum)\n3. Return maxSum\n\nKey insight: if currentSum < 0, starting fresh is always better.' },
     ],
     starterCode: new Map([
       ['python', 'def maxSubArray(nums: list[int]) -> int:\n    # Your code here\n    pass'],
@@ -260,9 +260,9 @@ A **subarray** is a contiguous non-empty sequence of elements within an array.`,
       { input: '[5,2,1,2,1,5]', expectedOutput: '14', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Water at each position = min(maxLeft, maxRight) - height[i].' },
-      { level: 2, content: 'You can precompute maxLeft and maxRight arrays.' },
-      { level: 3, content: 'Or use two pointers: process from both ends, moving the pointer with smaller max height.' },
+      { level: 1, content: 'At each position, water trapped = min(tallest bar to left, tallest bar to right) - current height. If this is negative, no water.' },
+      { level: 2, content: 'Approach 1: Precompute maxLeft[i] and maxRight[i] arrays. Approach 2: Two pointers from ends, process the side with smaller max height.' },
+      { level: 3, content: 'Two-pointer algorithm:\n1. left = 0, right = n-1, leftMax = 0, rightMax = 0, water = 0\n2. While left < right:\n   - If height[left] < height[right]:\n     - leftMax = max(leftMax, height[left])\n     - water += leftMax - height[left]\n     - left++\n   - Else:\n     - rightMax = max(rightMax, height[right])\n     - water += rightMax - height[right]\n     - right--\n3. Return water' },
     ],
     starterCode: new Map([
       ['python', 'def trap(height: list[int]) -> int:\n    # Your code here\n    pass'],
@@ -307,9 +307,9 @@ Given a string \`s\`, return \`true\` if it is a palindrome, or \`false\` otherw
       { input: '"hello"', expectedOutput: 'false', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Use two pointers at the start and end.' },
-      { level: 2, content: 'Skip non-alphanumeric characters.' },
-      { level: 3, content: 'Compare lowercase versions of characters at each pointer.' },
+      { level: 1, content: 'Ignore spaces and punctuation. Compare only letters and numbers, case-insensitively.' },
+      { level: 2, content: 'Use two pointers (start and end). Skip non-alphanumeric chars. Compare lowercase versions.' },
+      { level: 3, content: 'Algorithm:\n1. left = 0, right = len(s) - 1\n2. While left < right:\n   - While left < right and not s[left].isalnum(): left++\n   - While left < right and not s[right].isalnum(): right--\n   - If s[left].lower() != s[right].lower(): return False\n   - left++, right--\n3. Return True' },
     ],
     starterCode: new Map([
       ['python', 'def isPalindrome(s: str) -> bool:\n    # Your code here\n    pass'],
@@ -350,9 +350,9 @@ An **anagram** is a word or phrase formed by rearranging the letters of a differ
       { input: '""\n""', expectedOutput: 'true', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'What defines an anagram? Same characters, same counts.' },
-      { level: 2, content: 'Count the frequency of each character in both strings.' },
-      { level: 3, content: 'Use a hash map or array of 26 elements to count characters.' },
+      { level: 1, content: 'Anagrams have exactly the same characters with the same frequencies. How can you compare character counts?' },
+      { level: 2, content: 'First check if lengths are equal. Then count character frequencies - use a hash map or an array of size 26 (for lowercase letters).' },
+      { level: 3, content: 'Algorithm:\n1. If len(s) != len(t): return False\n2. count = {} (or [0]*26)\n3. For each char in s: count[char]++\n4. For each char in t: count[char]--\n5. Return True if all counts are 0\n\nAlternatively: sort both strings and compare.' },
     ],
     starterCode: new Map([
       ['python', 'def isAnagram(s: str, t: str) -> bool:\n    # Your code here\n    pass'],
@@ -392,9 +392,9 @@ An **anagram** is a word or phrase formed by rearranging the letters of a differ
       { input: '"abcdef"', expectedOutput: '6', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Use a sliding window approach.' },
-      { level: 2, content: 'Track characters in current window with a set or map.' },
-      { level: 3, content: 'Expand right, shrink left when duplicate found, track max length.' },
+      { level: 1, content: 'Use a sliding window. The window should contain only unique characters. What happens when you find a duplicate?' },
+      { level: 2, content: 'Keep a set of characters in the current window. When you find a duplicate, shrink the window from the left until the duplicate is removed.' },
+      { level: 3, content: 'Algorithm:\n1. left = 0, maxLen = 0, charSet = set()\n2. For right in 0 to len(s)-1:\n   - While s[right] in charSet:\n     - charSet.remove(s[left])\n     - left++\n   - charSet.add(s[right])\n   - maxLen = max(maxLen, right - left + 1)\n3. Return maxLen' },
     ],
     starterCode: new Map([
       ['python', 'def lengthOfLongestSubstring(s: str) -> int:\n    # Your code here\n    pass'],
@@ -441,9 +441,9 @@ The algorithm:
       { input: '"+-12"', expectedOutput: '0', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Handle whitespace, sign, and digits separately.' },
-      { level: 2, content: 'Watch for overflow - check before adding each digit.' },
-      { level: 3, content: 'Use long or check overflow condition: result > (MAX - digit) / 10.' },
+      { level: 1, content: 'Break the problem into steps: 1) Skip whitespace, 2) Handle sign, 3) Parse digits, 4) Handle overflow.' },
+      { level: 2, content: 'Use an index to track position. After sign, read digits until non-digit. Check overflow before each multiply/add.' },
+      { level: 3, content: 'Algorithm:\n1. i = 0, skip whitespace\n2. sign = 1; if s[i] == \'-\': sign = -1, i++; elif s[i] == \'+\': i++\n3. result = 0\n4. While i < len and s[i].isdigit():\n   - digit = int(s[i])\n   - If result > (2^31 - 1 - digit) / 10: return 2^31-1 if sign==1 else -2^31\n   - result = result * 10 + digit\n   - i++\n5. Return sign * result' },
     ],
     starterCode: new Map([
       ['python', 'def myAtoi(s: str) -> int:\n    # Your code here\n    pass'],
@@ -482,9 +482,9 @@ The algorithm:
       { input: '"aaaa"', expectedOutput: 'aaaa', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Expand around center approach works well.' },
-      { level: 2, content: 'For each position, try expanding as both odd and even length palindrome.' },
-      { level: 3, content: 'For each center, expand while characters match. Track the longest found.' },
+      { level: 1, content: 'A palindrome expands symmetrically from its center. Try each position as a potential center.' },
+      { level: 2, content: 'For each index, expand outward checking if chars match. Handle both odd length (single center) and even length (two centers).' },
+      { level: 3, content: 'Algorithm:\ndef expand(s, left, right):\n  while left >= 0 and right < len(s) and s[left] == s[right]:\n    left -= 1\n    right += 1\n  return s[left+1:right]\n\nFor each i in 0 to len(s)-1:\n  odd = expand(s, i, i)      # odd length\n  even = expand(s, i, i+1)   # even length\n  Update longest if either is longer\nReturn longest' },
     ],
     starterCode: new Map([
       ['python', 'def longestPalindrome(s: str) -> str:\n    # Your code here\n    pass'],
@@ -524,9 +524,9 @@ The algorithm:
       { input: '"cabwefgewcwaefgcf"\n"cae"', expectedOutput: 'cwae', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Use sliding window with two pointers.' },
-      { level: 2, content: 'Expand right to include all chars, then shrink left to minimize.' },
-      { level: 3, content: 'Track character counts. Window is valid when all t\'s chars are covered.' },
+      { level: 1, content: 'Use sliding window. You need to find the smallest window that contains all characters of t (with correct frequencies).' },
+      { level: 2, content: 'Count chars needed from t. Expand window right until valid, then shrink from left while staying valid. Track minimum.' },
+      { level: 3, content: 'Algorithm:\n1. need = Counter(t), have = 0, required = len(need)\n2. left = 0, minLen = inf, minStart = 0\n3. For right, char in enumerate(s):\n   - If char in need: window[char]++; if window[char] == need[char]: have++\n   - While have == required:\n     - If right-left+1 < minLen: update minLen, minStart\n     - leftChar = s[left]; if leftChar in need: if window[leftChar] == need[leftChar]: have--; window[leftChar]--\n     - left++\n4. Return s[minStart:minStart+minLen] or ""' },
     ],
     starterCode: new Map([
       ['python', 'def minWindow(s: str, t: str) -> str:\n    # Your code here\n    pass'],
@@ -569,9 +569,9 @@ The algorithm:
       { input: '[1,2,3,4,5,6,7,8,9,10]', expectedOutput: 'false', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'What data structure helps check if an element exists quickly?' },
-      { level: 2, content: 'Use a HashSet to track seen elements.' },
-      { level: 3, content: 'For each element, check if in set (return true), else add to set.' },
+      { level: 1, content: 'You need to check if any element appears more than once. What data structure gives O(1) lookup for "have I seen this before?"' },
+      { level: 2, content: 'Use a HashSet. For each number, check if it\'s already in the set. If yes, you found a duplicate. If no, add it.' },
+      { level: 3, content: 'Algorithm:\n1. seen = set()\n2. For num in nums:\n   - If num in seen: return True\n   - seen.add(num)\n3. Return False\n\nAlternative: sort array and check adjacent elements.' },
     ],
     starterCode: new Map([
       ['python', 'def containsDuplicate(nums: list[int]) -> bool:\n    # Your code here\n    pass'],
@@ -612,9 +612,9 @@ Each letter in \`magazine\` can only be used once in \`ransomNote\`.`,
       { input: '"aaab"\n"aab"', expectedOutput: 'false', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Count available letters in magazine.' },
-      { level: 2, content: 'Check if each letter needed for ransom note is available.' },
-      { level: 3, content: 'Use a frequency map. Decrement counts as you use letters.' },
+      { level: 1, content: 'You can only use each magazine letter once. Count how many of each letter the magazine has.' },
+      { level: 2, content: 'Build a frequency map of magazine letters. For each ransom note letter, check if available and decrement count.' },
+      { level: 3, content: 'Algorithm:\n1. count = {} (frequency map of magazine)\n2. For char in magazine: count[char]++\n3. For char in ransomNote:\n   - If char not in count or count[char] == 0: return False\n   - count[char]--\n4. Return True' },
     ],
     starterCode: new Map([
       ['python', 'def canConstruct(ransomNote: str, magazine: str) -> bool:\n    # Your code here\n    pass'],
@@ -656,9 +656,9 @@ An anagram is a word or phrase formed by rearranging the letters of a different 
       { input: '["listen","silent","enlist"]', expectedOutput: '[["listen","silent","enlist"]]', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Anagrams have the same characters when sorted.' },
-      { level: 2, content: 'Use sorted string as a key in a hash map.' },
-      { level: 3, content: 'Group words by their sorted form. Return all groups.' },
+      { level: 1, content: 'Anagrams are words with the same letters rearranged. What\'s a unique identifier for all anagrams of a word?' },
+      { level: 2, content: 'Sorted string is the same for all anagrams (e.g., "eat", "tea", "ate" all become "aet"). Use this as a hash map key.' },
+      { level: 3, content: 'Algorithm:\n1. groups = {} (map: sorted_string -> list of words)\n2. For word in strs:\n   - key = "".join(sorted(word))\n   - groups[key].append(word)\n3. Return list(groups.values())\n\nTime: O(n * k log k) where k is max word length' },
     ],
     starterCode: new Map([
       ['python', 'def groupAnagrams(strs: list[str]) -> list[list[str]]:\n    # Your code here\n    pass'],
@@ -699,9 +699,9 @@ An anagram is a word or phrase formed by rearranging the letters of a different 
       { input: '[3,0,1,0]\n1', expectedOutput: '[0]', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'First count frequencies using a hash map.' },
-      { level: 2, content: 'Then find the k highest frequencies.' },
-      { level: 3, content: 'Use a min-heap of size k, or bucket sort by frequency.' },
+      { level: 1, content: 'First, count how often each number appears. Then you need to find the k numbers with highest counts.' },
+      { level: 2, content: 'After counting frequencies, you can: 1) Use a heap to get top k, or 2) Use bucket sort where index = frequency.' },
+      { level: 3, content: 'Bucket sort approach:\n1. count = Counter(nums)\n2. buckets = [[] for _ in range(len(nums)+1)]\n3. For num, freq in count.items(): buckets[freq].append(num)\n4. result = []\n5. For i from len(buckets)-1 down to 0:\n   - result.extend(buckets[i])\n   - If len(result) >= k: break\n6. Return result[:k]' },
     ],
     starterCode: new Map([
       ['python', 'def topKFrequent(nums: list[int], k: int) -> list[int]:\n    # Your code here\n    pass'],
@@ -742,9 +742,9 @@ You must write an algorithm that runs in **O(n)** time.`,
       { input: '[1,0,-1]', expectedOutput: '3', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Use a HashSet for O(1) lookups.' },
-      { level: 2, content: 'Only start counting from numbers that are sequence starts (n-1 not in set).' },
-      { level: 3, content: 'For each sequence start, count consecutive numbers using the set.' },
+      { level: 1, content: 'Put all numbers in a HashSet for O(1) lookup. How do you avoid counting the same sequence multiple times?' },
+      { level: 2, content: 'Only start counting from sequence beginnings: a number n is a start if (n-1) is NOT in the set.' },
+      { level: 3, content: 'Algorithm:\n1. numSet = set(nums)\n2. maxLen = 0\n3. For num in numSet:\n   - If num-1 not in numSet:  # This is a sequence start\n     - length = 1\n     - While num + length in numSet: length++\n     - maxLen = max(maxLen, length)\n4. Return maxLen' },
     ],
     starterCode: new Map([
       ['python', 'def longestConsecutive(nums: list[int]) -> int:\n    # Your code here\n    pass'],
@@ -786,9 +786,9 @@ A subarray is a contiguous non-empty sequence of elements within an array.`,
       { input: '[0,0,0,0,0]\n0', expectedOutput: '15', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Use prefix sums. If prefixSum[j] - prefixSum[i] = k, subarray (i,j] sums to k.' },
-      { level: 2, content: 'Store prefix sum frequencies in a hash map.' },
-      { level: 3, content: 'For each prefix sum, check how many times (prefixSum - k) has occurred.' },
+      { level: 1, content: 'The key insight is prefix sums: if prefixSum[j] - prefixSum[i] = k, then the subarray from i+1 to j sums to k. What data structure helps you quickly find how many prefix sums equal a target value?' },
+      { level: 2, content: 'Use a hash map to store the frequency of each prefix sum seen so far. For each new prefix sum, check how many times (currentSum - k) has appeared - that\'s the count of subarrays ending here that sum to k.' },
+      { level: 3, content: 'Algorithm:\n1. prefixCount = {0: 1}  # Empty prefix has sum 0\n2. currentSum = 0, count = 0\n3. For num in nums:\n   - currentSum += num\n   - If (currentSum - k) in prefixCount:\n     - count += prefixCount[currentSum - k]\n   - prefixCount[currentSum] = prefixCount.get(currentSum, 0) + 1\n4. Return count' },
     ],
     starterCode: new Map([
       ['python', 'def subarraySum(nums: list[int], k: int) -> int:\n    # Your code here\n    pass'],
@@ -832,9 +832,9 @@ A subarray is a contiguous non-empty sequence of elements within an array.`,
       { input: '[0,-1,2,-3]', expectedOutput: '[-3,2,-1,0]', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Use three pointers: prev, curr, next.' },
-      { level: 2, content: 'At each step, reverse the current node\'s pointer.' },
-      { level: 3, content: 'Save next, point curr to prev, move prev to curr, move curr to next.' },
+      { level: 1, content: 'You need to change each node\'s "next" pointer to point to its previous node instead. What pointers do you need to track to avoid losing access to the rest of the list?' },
+      { level: 2, content: 'Use three pointers: prev (starts null), curr (starts at head), and a temporary variable to save the next node before you overwrite curr.next.' },
+      { level: 3, content: 'Algorithm:\n1. prev = None, curr = head\n2. While curr is not None:\n   - next_temp = curr.next  # Save next\n   - curr.next = prev       # Reverse pointer\n   - prev = curr            # Move prev forward\n   - curr = next_temp       # Move curr forward\n3. Return prev  # New head' },
     ],
     starterCode: new Map([
       ['python', '# Definition for singly-linked list.\nclass ListNode:\n    def __init__(self, val=0, next=None):\n        self.val = val\n        self.next = next\n\ndef reverseList(head: ListNode) -> ListNode:\n    # Your code here\n    pass'],
@@ -878,9 +878,9 @@ Return the head of the merged linked list.`,
       { input: '[-5,-3,-1]\n[-4,-2,0]', expectedOutput: '[-5,-4,-3,-2,-1,0]', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Use a dummy head to simplify edge cases.' },
-      { level: 2, content: 'Compare nodes from both lists, append smaller one.' },
-      { level: 3, content: 'After one list is exhausted, append remaining nodes from the other.' },
+      { level: 1, content: 'Create a dummy head node to simplify edge cases (like when one list is empty). How do you decide which node to add next to your result?' },
+      { level: 2, content: 'Keep a "tail" pointer at the end of your merged list. Compare the heads of both lists, attach the smaller one to tail, then advance that list\'s pointer.' },
+      { level: 3, content: 'Algorithm:\n1. dummy = ListNode(), tail = dummy\n2. While list1 and list2 are both not None:\n   - If list1.val <= list2.val:\n     - tail.next = list1\n     - list1 = list1.next\n   - Else:\n     - tail.next = list2\n     - list2 = list2.next\n   - tail = tail.next\n3. tail.next = list1 or list2  # Attach remaining\n4. Return dummy.next' },
     ],
     starterCode: new Map([
       ['python', '# Definition for singly-linked list.\nclass ListNode:\n    def __init__(self, val=0, next=None):\n        self.val = val\n        self.next = next\n\ndef mergeTwoLists(list1: ListNode, list2: ListNode) -> ListNode:\n    # Your code here\n    pass'],
@@ -923,9 +923,9 @@ Return \`true\` if there is a cycle in the linked list. Otherwise, return \`fals
       { input: '[0,1,2,3]', expectedOutput: 'false', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Use Floyd\'s cycle detection (tortoise and hare).' },
-      { level: 2, content: 'Have two pointers: slow moves 1 step, fast moves 2 steps.' },
-      { level: 3, content: 'If there\'s a cycle, fast will eventually meet slow. If fast reaches null, no cycle.' },
+      { level: 1, content: 'Floyd\'s Cycle Detection (Tortoise and Hare): Use two pointers moving at different speeds. If there\'s a cycle, the fast pointer will eventually "lap" the slow pointer.' },
+      { level: 2, content: 'Slow pointer moves 1 step per iteration, fast pointer moves 2 steps. If they ever point to the same node, there\'s a cycle. If fast reaches null, no cycle exists.' },
+      { level: 3, content: 'Algorithm:\n1. If head is None: return False\n2. slow = head, fast = head\n3. While fast is not None and fast.next is not None:\n   - slow = slow.next\n   - fast = fast.next.next\n   - If slow == fast: return True\n4. Return False  # fast reached end, no cycle' },
     ],
     starterCode: new Map([
       ['python', '# Definition for singly-linked list.\nclass ListNode:\n    def __init__(self, val=0, next=None):\n        self.val = val\n        self.next = next\n\ndef hasCycle(head: ListNode) -> bool:\n    # Your code here\n    pass'],
@@ -966,9 +966,9 @@ Return \`true\` if there is a cycle in the linked list. Otherwise, return \`fals
       { input: '[1,2,3,4,5]\n5', expectedOutput: '[2,3,4,5]', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Use two pointers with n nodes gap between them.' },
-      { level: 2, content: 'When fast pointer reaches end, slow is at the node before the target.' },
-      { level: 3, content: 'Use a dummy node to handle edge case of removing head.' },
+      { level: 1, content: 'The key insight: if you have two pointers n nodes apart, when the front one reaches the end, the back one is at the node before the one to remove. Use a dummy node to handle removing the head.' },
+      { level: 2, content: 'Advance the "fast" pointer n steps first. Then move both pointers together until fast reaches the last node. Now "slow" points to the node BEFORE the one to delete.' },
+      { level: 3, content: 'Algorithm:\n1. dummy = ListNode(0, head)\n2. slow = dummy, fast = dummy\n3. For i in range(n + 1): fast = fast.next  # n+1 gap\n4. While fast is not None:\n   - slow = slow.next\n   - fast = fast.next\n5. slow.next = slow.next.next  # Remove node\n6. Return dummy.next' },
     ],
     starterCode: new Map([
       ['python', '# Definition for singly-linked list.\nclass ListNode:\n    def __init__(self, val=0, next=None):\n        self.val = val\n        self.next = next\n\ndef removeNthFromEnd(head: ListNode, n: int) -> ListNode:\n    # Your code here\n    pass'],
@@ -1011,9 +1011,9 @@ You may not modify the values in the list's nodes. Only nodes themselves may be 
       { input: '[1,2,3,4,5,6,7]', expectedOutput: '[1,7,2,6,3,5,4]', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Break into three steps: find middle, reverse second half, merge.' },
-      { level: 2, content: 'Use slow/fast pointers to find middle. Reverse second half in place.' },
-      { level: 3, content: 'Merge by alternating: take from first, take from reversed second.' },
+      { level: 1, content: 'This combines three classic linked list operations: (1) Find the middle, (2) Reverse a linked list, (3) Merge two lists. Think about how you can apply each.' },
+      { level: 2, content: 'Use slow/fast pointers to find the middle. Reverse the second half in place. Then merge the two halves by alternating nodes: first takes a node, then second takes a node.' },
+      { level: 3, content: 'Algorithm:\n1. Find middle: slow=fast=head; while fast and fast.next: slow=slow.next, fast=fast.next.next\n2. Reverse second half: prev=None, curr=slow.next; slow.next=None\n   While curr: next=curr.next, curr.next=prev, prev=curr, curr=next\n3. Merge: first=head, second=prev\n   While second:\n   - tmp1, tmp2 = first.next, second.next\n   - first.next = second\n   - second.next = tmp1\n   - first, second = tmp1, tmp2' },
     ],
     starterCode: new Map([
       ['python', '# Definition for singly-linked list.\nclass ListNode:\n    def __init__(self, val=0, next=None):\n        self.val = val\n        self.next = next\n\ndef reorderList(head: ListNode) -> None:\n    # Your code here - modify in place\n    pass'],
@@ -1058,9 +1058,9 @@ Merge all the linked-lists into one sorted linked-list and return it.`,
       { input: '[[-2,1],[-1,0,3],[-3,2]]', expectedOutput: '[-3,-2,-1,0,1,2,3]', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Use a min-heap to efficiently get the smallest element.' },
-      { level: 2, content: 'Add head of each list to heap. Pop min, add its next to heap.' },
-      { level: 3, content: 'Alternative: divide and conquer - merge pairs of lists repeatedly.' },
+      { level: 1, content: 'A min-heap lets you efficiently find the smallest element among k candidates. What should you put in the heap, and what do you do after removing the minimum?' },
+      { level: 2, content: 'Add the head of each non-empty list to a min-heap (sorted by node value). Pop the min node, add it to your result, and if that node has a next, push next onto the heap.' },
+      { level: 3, content: 'Min-Heap Algorithm:\n1. heap = [], dummy = ListNode(), tail = dummy\n2. For each list in lists:\n   - If list is not None: heappush(heap, (list.val, i, list))\n3. While heap:\n   - val, i, node = heappop(heap)\n   - tail.next = node\n   - tail = tail.next\n   - If node.next: heappush(heap, (node.next.val, i, node.next))\n4. Return dummy.next\n\nNote: Include index i in tuple to break ties (Python heap comparison)' },
     ],
     starterCode: new Map([
       ['python', '# Definition for singly-linked list.\nclass ListNode:\n    def __init__(self, val=0, next=None):\n        self.val = val\n        self.next = next\n\ndef mergeKLists(lists: list[ListNode]) -> ListNode:\n    # Your code here\n    pass'],
@@ -1105,9 +1105,9 @@ A binary tree's **maximum depth** is the number of nodes along the longest path 
       { input: '[1,2,null,3,null,4]', expectedOutput: '4', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Use recursion. What is the depth of a tree?' },
-      { level: 2, content: 'Depth = 1 + max(depth of left subtree, depth of right subtree).' },
-      { level: 3, content: 'Base case: null node has depth 0. Recursively compute max of children + 1.' },
+      { level: 1, content: 'Think recursively: the depth of a tree is 1 (for the root) plus the maximum depth of its subtrees. What\'s the base case?' },
+      { level: 2, content: 'Base case: if node is null, return 0 (no depth). Otherwise return 1 + max(depth of left, depth of right). This naturally computes the longest path.' },
+      { level: 3, content: 'Algorithm:\ndef maxDepth(root):\n    if root is None:\n        return 0\n    left_depth = maxDepth(root.left)\n    right_depth = maxDepth(root.right)\n    return 1 + max(left_depth, right_depth)' },
     ],
     starterCode: new Map([
       ['python', '# Definition for a binary tree node.\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\ndef maxDepth(root: TreeNode) -> int:\n    # Your code here\n    pass'],
@@ -1148,9 +1148,9 @@ Inverting a binary tree means swapping the left and right children of all nodes 
       { input: '[1,2,3,4,5,6,7]', expectedOutput: '[1,3,2,7,6,5,4]', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Swap left and right children of each node.' },
-      { level: 2, content: 'Use recursion: swap children, then recursively invert subtrees.' },
-      { level: 3, content: 'Base case: null node. Swap left/right, recursively call on both.' },
+      { level: 1, content: 'To invert, you need to swap the left and right children of every node in the tree. Recursion makes this straightforward - what do you do at each node?' },
+      { level: 2, content: 'At each node: swap its left and right children, then recursively invert both subtrees. The order of operations doesn\'t matter here.' },
+      { level: 3, content: 'Algorithm:\ndef invertTree(root):\n    if root is None:\n        return None\n    # Swap children\n    root.left, root.right = root.right, root.left\n    # Recursively invert subtrees\n    invertTree(root.left)\n    invertTree(root.right)\n    return root' },
     ],
     starterCode: new Map([
       ['python', '# Definition for a binary tree node.\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\ndef invertTree(root: TreeNode) -> TreeNode:\n    # Your code here\n    pass'],
@@ -1189,9 +1189,9 @@ Inverting a binary tree means swapping the left and right children of all nodes 
       { input: '[1,2,null,3,null,4]', expectedOutput: '[[1],[2],[3],[4]]', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Use BFS with a queue.' },
-      { level: 2, content: 'Process nodes level by level. Track level size before processing.' },
-      { level: 3, content: 'For each level: record queue size, process that many nodes, add their children.' },
+      { level: 1, content: 'BFS naturally visits nodes level by level. Use a queue to process nodes, but how do you know when one level ends and the next begins?' },
+      { level: 2, content: 'Before processing each level, record the queue size - that\'s exactly how many nodes are at this level. Process that many nodes, adding their children for the next level.' },
+      { level: 3, content: 'Algorithm:\n1. If root is None: return []\n2. result = [], queue = [root]\n3. While queue is not empty:\n   - level_size = len(queue)\n   - level = []\n   - For i in range(level_size):\n     - node = queue.pop(0)\n     - level.append(node.val)\n     - If node.left: queue.append(node.left)\n     - If node.right: queue.append(node.right)\n   - result.append(level)\n4. Return result' },
     ],
     starterCode: new Map([
       ['python', '# Definition for a binary tree node.\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\ndef levelOrder(root: TreeNode) -> list[list[int]]:\n    # Your code here\n    pass'],
@@ -1235,9 +1235,9 @@ A **valid BST** is defined as follows:
       { input: '[10,5,15,null,null,6,20]', expectedOutput: 'false', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Each node must be within a valid range.' },
-      { level: 2, content: 'Pass min/max bounds down the recursion.' },
-      { level: 3, content: 'For left child: upper bound = parent. For right child: lower bound = parent.' },
+      { level: 1, content: 'A common mistake: just checking if node.left.val < node.val < node.right.val isn\'t enough. A node must be valid with respect to ALL its ancestors. How can you track this?' },
+      { level: 2, content: 'Pass min and max bounds down the recursion. When going left, the current node becomes the new upper bound. When going right, it becomes the new lower bound.' },
+      { level: 3, content: 'Algorithm:\ndef isValidBST(root, min_val=-inf, max_val=inf):\n    if root is None:\n        return True\n    if root.val <= min_val or root.val >= max_val:\n        return False\n    # Left subtree: all values must be < root.val\n    # Right subtree: all values must be > root.val\n    return (isValidBST(root.left, min_val, root.val) and\n            isValidBST(root.right, root.val, max_val))' },
     ],
     starterCode: new Map([
       ['python', '# Definition for a binary tree node.\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\ndef isValidBST(root: TreeNode) -> bool:\n    # Your code here\n    pass'],
@@ -1280,9 +1280,9 @@ Given the \`root\` of a binary tree, return the maximum path sum of any **non-em
       { input: '[5,4,8,11,null,13,4,7,2,null,null,null,1]', expectedOutput: '48', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'At each node, you can either continue the path or start fresh.' },
-      { level: 2, content: 'For each node, compute max path going through it (left + node + right).' },
-      { level: 3, content: 'Return to parent: max of (node, node+left, node+right). Track global max.' },
+      { level: 1, content: 'The key insight: a path through a node can go left-node-right (making a "peak" at this node), but when returning a value to the parent, you can only go one direction. Track a global maximum.' },
+      { level: 2, content: 'At each node: (1) Compute max path using this node as the "peak" (left + node + right). Update global max. (2) Return to parent the max single-direction path: max(node, node+left, node+right).' },
+      { level: 3, content: 'Algorithm:\nmax_sum = -infinity\n\ndef dfs(node):\n    if node is None: return 0\n    # Get max contribution from children (0 if negative)\n    left = max(0, dfs(node.left))\n    right = max(0, dfs(node.right))\n    # Update global max (path peaks at this node)\n    max_sum = max(max_sum, left + node.val + right)\n    # Return max single path to parent\n    return node.val + max(left, right)\n\ndfs(root)\nreturn max_sum' },
     ],
     starterCode: new Map([
       ['python', '# Definition for a binary tree node.\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\ndef maxPathSum(root: TreeNode) -> int:\n    # Your code here\n    pass'],
@@ -1326,9 +1326,9 @@ The lowest common ancestor is defined as the lowest node in the tree that has bo
       { input: '[1,2,3,4,5]\n4\n5', expectedOutput: '2', isHidden: true },
     ],
     hints: [
-      { level: 1, content: 'Use recursion. What does finding p or q in a subtree tell you?' },
-      { level: 2, content: 'If both left and right subtrees return non-null, current node is LCA.' },
-      { level: 3, content: 'Return p/q if found, null otherwise. If both children return non-null, return current.' },
+      { level: 1, content: 'Think recursively: if you find p or q in a subtree, what does that tell you? The LCA is the first node where p and q are found in different subtrees (or the node is p or q itself).' },
+      { level: 2, content: 'Recursively search left and right subtrees. If both return non-null, current node is the LCA (p and q are on different sides). If one side returns null, the answer is on the other side.' },
+      { level: 3, content: 'Algorithm:\ndef lowestCommonAncestor(root, p, q):\n    # Base case\n    if root is None or root == p or root == q:\n        return root\n    \n    # Search both subtrees\n    left = lowestCommonAncestor(root.left, p, q)\n    right = lowestCommonAncestor(root.right, p, q)\n    \n    # If both sides found something, root is LCA\n    if left and right:\n        return root\n    # Otherwise return whichever side found something\n    return left if left else right' },
     ],
     starterCode: new Map([
       ['python', '# Definition for a binary tree node.\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\ndef lowestCommonAncestor(root: TreeNode, p: TreeNode, q: TreeNode) -> TreeNode:\n    # Your code here\n    pass'],
@@ -1347,7 +1347,10 @@ The lowest common ancestor is defined as the lowest node in the tree that has bo
 async function seedProblems() {
   try {
     console.log('Connecting to MongoDB...');
-    await mongoose.connect(config.mongodb.uri);
+    await mongoose.connect(config.mongodb.uri, {
+      serverSelectionTimeoutMS: 30000,
+      connectTimeoutMS: 30000,
+    });
     console.log('Connected to MongoDB');
 
     console.log('Clearing existing problems...');
@@ -1380,4 +1383,7 @@ async function seedProblems() {
   }
 }
 
-seedProblems();
+// Only run when executed directly, not when imported
+if (require.main === module) {
+  seedProblems();
+}

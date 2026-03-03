@@ -594,7 +594,7 @@ function HintCard({
       </div>
 
       {isUnlocked ? (
-        <div className="text-slate-300 text-sm">
+        <div className="text-slate-300 text-sm whitespace-pre-wrap">
           <ReactMarkdown>{content || 'Loading...'}</ReactMarkdown>
         </div>
       ) : (

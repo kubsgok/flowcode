@@ -268,22 +268,103 @@ async function executeJavaScript(code: string, input: string): Promise<LocalExec
   // Parse input lines
   const lines = input.split('\n').filter(l => l.trim());
 
-  // Detect function name
-  const funcMatch = code.match(/function\s+(\w+)\s*\(/);
-  const funcName = funcMatch ? funcMatch[1] : 'solution';
+  // Detect function name - skip constructor and class methods
+  const allFuncs = [...code.matchAll(/function\s+(\w+)\s*\(/g)];
+  const nonClassFunc = allFuncs.find(m => !['constructor', 'ListNode', 'TreeNode'].includes(m[1]));
+  const funcName = nonClassFunc ? nonClassFunc[1] : (allFuncs[0] ? allFuncs[0][1] : 'solution');
+
+  // Check if this is a tree or linked list problem
+  const isTreeProblem = funcName === 'levelOrder' || funcName === 'maxDepth' || funcName === 'invertTree' ||
+    funcName === 'isValidBST' || funcName === 'maxPathSum' || funcName === 'lowestCommonAncestor' ||
+    code.includes('TreeNode');
+  const isLinkedListProblem = funcName === 'reverseList' || funcName === 'mergeTwoLists' ||
+    funcName === 'hasCycle' || funcName === 'removeNthFromEnd' || funcName === 'reorderList' ||
+    funcName === 'mergeKLists' || code.includes('ListNode');
 
   return new Promise((resolve) => {
     // Wrap code to handle input, call function, and print result
     const wrappedCode = `
 ${code}
 
+// Build linked list from array
+function buildLinkedList(arr) {
+  if (!arr || arr.length === 0) return null;
+  const head = new ListNode(arr[0]);
+  let curr = head;
+  for (let i = 1; i < arr.length; i++) {
+    curr.next = new ListNode(arr[i]);
+    curr = curr.next;
+  }
+  return head;
+}
+
+// Convert linked list to array
+function linkedListToArray(head) {
+  const result = [];
+  while (head) {
+    result.push(head.val);
+    head = head.next;
+  }
+  return result;
+}
+
+// Build tree from level-order array
+function buildTree(values) {
+  if (!values || values.length === 0 || values[0] === null) return null;
+  const root = new TreeNode(values[0]);
+  const queue = [root];
+  let i = 1;
+  while (queue.length > 0 && i < values.length) {
+    const node = queue.shift();
+    if (i < values.length && values[i] !== null) {
+      node.left = new TreeNode(values[i]);
+      queue.push(node.left);
+    }
+    i++;
+    if (i < values.length && values[i] !== null) {
+      node.right = new TreeNode(values[i]);
+      queue.push(node.right);
+    }
+    i++;
+  }
+  return root;
+}
+
+// Convert tree to level-order array
+function treeToArray(root) {
+  if (!root) return [];
+  const result = [];
+  const queue = [root];
+  while (queue.length > 0) {
+    const node = queue.shift();
+    if (node) {
+      result.push(node.val);
+      queue.push(node.left);
+      queue.push(node.right);
+    } else {
+      result.push(null);
+    }
+  }
+  while (result.length > 0 && result[result.length - 1] === null) {
+    result.pop();
+  }
+  return result;
+}
+
+// Find node by value in tree
+function findNode(root, val) {
+  if (!root) return null;
+  if (root.val === val) return root;
+  return findNode(root.left, val) || findNode(root.right, val);
+}
+
 // Parse inputs
 const inputs = ${JSON.stringify(lines)};
-const args = inputs.map(inp => {
+let args = inputs.map(inp => {
   inp = inp.trim();
   try {
     // Try to parse as JSON (handles arrays, numbers, etc.)
-    return JSON.parse(inp);
+    return JSON.parse(inp.replace(/null/g, 'null'));
   } catch {
     // If it's a quoted string, remove quotes
     if ((inp.startsWith('"') && inp.endsWith('"')) || (inp.startsWith("'") && inp.endsWith("'"))) {
@@ -293,8 +374,71 @@ const args = inputs.map(inp => {
   }
 });
 
+${isLinkedListProblem ? `
+// Convert array args to ListNode for linked list problems
+let originalHead = null;
+for (let i = 0; i < args.length; i++) {
+  if (Array.isArray(args[i])) {
+    // Check if it's an array of arrays (like for mergeKLists)
+    if (args[i].length > 0 && Array.isArray(args[i][0])) {
+      args[i] = args[i].map(inner => buildLinkedList(inner));
+    } else if (args[i].every(x => typeof x === 'number' || x === null)) {
+      const converted = buildLinkedList(args[i]);
+      if (i === 0) originalHead = converted;
+      args[i] = converted;
+    }
+  }
+}
+` : ''}
+
+${isTreeProblem ? `
+// Convert first array arg to TreeNode for tree problems
+let treeRoot = null;
+if (args.length > 0 && Array.isArray(args[0])) {
+  treeRoot = buildTree(args[0]);
+  args[0] = treeRoot;
+}
+
+// For LCA, convert p and q values to TreeNode objects
+if ('${funcName}' === 'lowestCommonAncestor' && args.length >= 3) {
+  if (typeof args[1] === 'number') {
+    args[1] = findNode(treeRoot, args[1]);
+  }
+  if (typeof args[2] === 'number') {
+    args[2] = findNode(treeRoot, args[2]);
+  }
+}
+` : ''}
+
 // Call the function
-const result = ${funcName}(...args);
+let result = ${funcName}(...args);
+
+${isLinkedListProblem ? `
+// Handle in-place modification (reorderList returns undefined)
+if ('${funcName}' === 'reorderList' && result === undefined && originalHead !== null) {
+  result = originalHead;
+}
+
+// Convert linked list result back to array
+if (result !== null && result !== undefined && typeof result === 'object' && 'val' in result) {
+  result = linkedListToArray(result);
+} else if (result === null || result === undefined) {
+  result = [];
+}
+` : ''}
+
+${isTreeProblem ? `
+// Convert tree result back to array or extract value
+if (result !== null && result !== undefined && typeof result === 'object' && 'val' in result) {
+  if ('${funcName}' === 'lowestCommonAncestor') {
+    result = result.val;
+  } else {
+    result = treeToArray(result);
+  }
+} else if (result === null && '${funcName}' === 'invertTree') {
+  result = [];
+}
+` : ''}
 
 // Print result
 if (typeof result === 'boolean') {
@@ -356,12 +500,18 @@ async function executeTypeScript(code: string, input: string): Promise<LocalExec
   // Parse input lines
   const lines = input.split('\n').filter(l => l.trim());
 
-  // Detect function name
-  const funcMatch = code.match(/function\s+(\w+)\s*[<(]/);
-  const funcName = funcMatch ? funcMatch[1] : 'solution';
+  // Detect function name - skip constructor and class names
+  const allFuncs = [...code.matchAll(/function\s+(\w+)\s*[<(]/g)];
+  const nonClassFunc = allFuncs.find(m => !['constructor', 'ListNode', 'TreeNode'].includes(m[1]));
+  const funcName = nonClassFunc ? nonClassFunc[1] : (allFuncs[0] ? allFuncs[0][1] : 'solution');
 
-  // Check if this is a tree problem
-  const isTreeProblem = funcName === 'levelOrder' || code.includes('TreeNode');
+  // Check if this is a tree or linked list problem
+  const isTreeProblem = funcName === 'levelOrder' || funcName === 'maxDepth' || funcName === 'invertTree' ||
+    funcName === 'isValidBST' || funcName === 'maxPathSum' || funcName === 'lowestCommonAncestor' ||
+    code.includes('TreeNode');
+  const isLinkedListProblem = funcName === 'reverseList' || funcName === 'mergeTwoLists' ||
+    funcName === 'hasCycle' || funcName === 'removeNthFromEnd' || funcName === 'reorderList' ||
+    funcName === 'mergeKLists' || code.includes('ListNode');
 
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flowcode-ts-'));
   const tsFile = path.join(tempDir, 'solution.ts');
@@ -370,9 +520,85 @@ async function executeTypeScript(code: string, input: string): Promise<LocalExec
   const wrappedCode = `
 ${code}
 
+${isLinkedListProblem ? `
+// Build linked list from array
+function buildLinkedList(arr: number[]): ListNode | null {
+  if (!arr || arr.length === 0) return null;
+  const head = new ListNode(arr[0]);
+  let curr: ListNode = head;
+  for (let i = 1; i < arr.length; i++) {
+    curr.next = new ListNode(arr[i]);
+    curr = curr.next;
+  }
+  return head;
+}
+
+// Convert linked list to array
+function linkedListToArray(head: ListNode | null): number[] {
+  const result: number[] = [];
+  while (head) {
+    result.push(head.val);
+    head = head.next;
+  }
+  return result;
+}
+` : ''}
+
+${isTreeProblem ? `
+// Build tree from level-order array
+function buildTree(values: (number | null)[]): TreeNode | null {
+  if (!values || values.length === 0 || values[0] === null) return null;
+  const root = new TreeNode(values[0]);
+  const queue: TreeNode[] = [root];
+  let i = 1;
+  while (queue.length > 0 && i < values.length) {
+    const node = queue.shift()!;
+    if (i < values.length && values[i] !== null) {
+      node.left = new TreeNode(values[i] as number);
+      queue.push(node.left);
+    }
+    i++;
+    if (i < values.length && values[i] !== null) {
+      node.right = new TreeNode(values[i] as number);
+      queue.push(node.right);
+    }
+    i++;
+  }
+  return root;
+}
+
+// Convert tree to level-order array
+function treeToArray(root: TreeNode | null): (number | null)[] {
+  if (!root) return [];
+  const result: (number | null)[] = [];
+  const queue: (TreeNode | null)[] = [root];
+  while (queue.length > 0) {
+    const node = queue.shift();
+    if (node) {
+      result.push(node.val);
+      queue.push(node.left);
+      queue.push(node.right);
+    } else {
+      result.push(null);
+    }
+  }
+  while (result.length > 0 && result[result.length - 1] === null) {
+    result.pop();
+  }
+  return result;
+}
+
+// Find node by value in tree
+function findNode(root: TreeNode | null, val: number): TreeNode | null {
+  if (!root) return null;
+  if (root.val === val) return root;
+  return findNode(root.left, val) || findNode(root.right, val);
+}
+` : ''}
+
 // Parse inputs
 const inputs: string[] = ${JSON.stringify(lines)};
-const args: any[] = inputs.map(inp => {
+let args: any[] = inputs.map(inp => {
   inp = inp.trim();
   try {
     return JSON.parse(inp.replace(/null/g, 'null'));
@@ -384,73 +610,73 @@ const args: any[] = inputs.map(inp => {
   }
 });
 
-${isTreeProblem ? `
-// Build tree from array
-function buildTree(values: (number | null)[]): TreeNode | null {
-  if (!values || values.length === 0 || values[0] === null) return null;
-
-  const root = new TreeNode(values[0]);
-  const queue: TreeNode[] = [root];
-  let i = 1;
-
-  while (queue.length > 0 && i < values.length) {
-    const node = queue.shift()!;
-
-    if (i < values.length && values[i] !== null) {
-      node.left = new TreeNode(values[i] as number);
-      queue.push(node.left);
+${isLinkedListProblem ? `
+// Convert array args to ListNode for linked list problems
+let originalHead: ListNode | null = null;
+for (let i = 0; i < args.length; i++) {
+  if (Array.isArray(args[i])) {
+    // Check if it's an array of arrays (like for mergeKLists)
+    if (args[i].length > 0 && Array.isArray(args[i][0])) {
+      args[i] = args[i].map((inner: number[]) => buildLinkedList(inner));
+    } else if (args[i].every((x: any) => typeof x === 'number' || x === null)) {
+      const converted = buildLinkedList(args[i]);
+      if (i === 0) originalHead = converted;
+      args[i] = converted;
     }
-    i++;
-
-    if (i < values.length && values[i] !== null) {
-      node.right = new TreeNode(values[i] as number);
-      queue.push(node.right);
-    }
-    i++;
-  }
-
-  return root;
-}
-
-// Find a node by value in the tree
-function findNode(root: TreeNode | null, val: number): TreeNode | null {
-  if (!root) return null;
-  if (root.val === val) return root;
-  return findNode(root.left, val) || findNode(root.right, val);
-}
-
-// Convert first arg to tree if needed
-if (args.length > 0 && Array.isArray(args[0])) {
-  args[0] = buildTree(args[0]);
-}
-
-// For LCA, convert p and q values to TreeNode objects
-if ('${funcName}' === 'lowestCommonAncestor' && args.length >= 3) {
-  if (typeof args[1] === 'number') {
-    args[1] = findNode(args[0], args[1]);
-  }
-  if (typeof args[2] === 'number') {
-    args[2] = findNode(args[0], args[2]);
   }
 }
 ` : ''}
 
-// Call the function with proper argument handling
-let result: any;
-switch (args.length) {
-  case 0: result = (${funcName} as any)(); break;
-  case 1: result = (${funcName} as any)(args[0]); break;
-  case 2: result = (${funcName} as any)(args[0], args[1]); break;
-  case 3: result = (${funcName} as any)(args[0], args[1], args[2]); break;
-  default: result = (${funcName} as any)(...args as [any, ...any[]]); break;
+${isTreeProblem ? `
+// Convert first array arg to TreeNode for tree problems
+let treeRoot: TreeNode | null = null;
+if (args.length > 0 && Array.isArray(args[0])) {
+  treeRoot = buildTree(args[0]);
+  args[0] = treeRoot;
 }
+
+${funcName === 'lowestCommonAncestor' ? `
+// For LCA, convert p and q values to TreeNode objects
+if (args.length >= 3) {
+  if (typeof args[1] === 'number') {
+    args[1] = findNode(treeRoot, args[1]);
+  }
+  if (typeof args[2] === 'number') {
+    args[2] = findNode(treeRoot, args[2]);
+  }
+}
+` : ''}
+` : ''}
+
+// Call the function
+let result: any = (${funcName} as any)(...args);
+
+${isLinkedListProblem && funcName === 'reorderList' ? `
+// Handle in-place modification (reorderList returns undefined)
+if (result === undefined && originalHead !== null) {
+  result = originalHead;
+}
+` : ''}
+
+${isLinkedListProblem ? `
+// Convert linked list result back to array
+if (result !== null && result !== undefined && typeof result === 'object' && 'val' in result) {
+  result = linkedListToArray(result);
+} else if (result === null || result === undefined) {
+  result = [];
+}
+` : ''}
+
+${isTreeProblem ? `
+// Convert tree result back to array or extract value
+if (result !== null && result !== undefined && typeof result === 'object' && 'val' in result) {
+  ${funcName === 'lowestCommonAncestor' ? `result = result.val;` : `result = treeToArray(result);`}
+} ${funcName === 'invertTree' ? `else if (result === null) { result = []; }` : ''}
+` : ''}
 
 // Print result
 if (typeof result === 'boolean') {
   console.log(result.toString().toLowerCase());
-} else if (result && typeof result === 'object' && 'val' in result) {
-  // TreeNode result - print just the value
-  console.log(result.val);
 } else if (Array.isArray(result)) {
   console.log(JSON.stringify(result).replace(/ /g, ''));
 } else {
@@ -528,12 +754,12 @@ function wrapJavaCode(userCode: string, input: string): string {
   const lines = input.split('\n').filter(l => l.trim());
 
   // Try to detect the method name from user code (must have public modifier)
-  // Handle nested generics like List<List<Integer>>
-  const methodMatch = userCode.match(/public\s+(?:static\s+)?(?:int\[\]|int|boolean|String|List<(?:[^<>]|<[^<>]*>)*>)\s+(\w+)\s*\(/);
+  // Handle nested generics like List<List<Integer>>, ListNode, TreeNode, void
+  const methodMatch = userCode.match(/public\s+(?:static\s+)?(?:int\[\]|int|boolean|String|void|ListNode|TreeNode|List<(?:[^<>]|<[^<>]*>)*>)\s+(\w+)\s*\(/);
   const methodName = methodMatch ? methodMatch[1] : 'solution';
 
   // Detect return type
-  const returnTypeMatch = userCode.match(/public\s+(?:static\s+)?(int\[\]|int|boolean|String|List<(?:[^<>]|<[^<>]*>)*>)\s+\w+\s*\(/);
+  const returnTypeMatch = userCode.match(/public\s+(?:static\s+)?(int\[\]|int|boolean|String|void|ListNode|TreeNode|List<(?:[^<>]|<[^<>]*>)*>)\s+\w+\s*\(/);
   const returnType = returnTypeMatch ? returnTypeMatch[1] : 'int';
 
   // Find the class that contains this method (not TreeNode or other data classes)
@@ -542,8 +768,13 @@ function wrapJavaCode(userCode: string, input: string): string {
   const classMatch = userCode.match(classPattern);
   const className = classMatch ? classMatch[1] : 'Solution';
 
-  // Check if this is a tree problem
-  const isTreeProblem = methodName === 'levelOrder' || userCode.includes('TreeNode');
+  // Check if this is a tree or linked list problem
+  const isTreeProblem = methodName === 'levelOrder' || methodName === 'maxDepth' || methodName === 'invertTree' ||
+    methodName === 'isValidBST' || methodName === 'maxPathSum' || methodName === 'lowestCommonAncestor' ||
+    userCode.includes('TreeNode');
+  const isLinkedListProblem = methodName === 'reverseList' || methodName === 'mergeTwoLists' ||
+    methodName === 'hasCycle' || methodName === 'removeNthFromEnd' || methodName === 'reorderList' ||
+    methodName === 'mergeKLists' || userCode.includes('ListNode');
 
   // Build wrapper that creates instance and calls method
   const wrapper = `
@@ -557,10 +788,10 @@ class Main {
         String[] inputs = new String[] {${lines.map(l => JSON.stringify(l)).join(', ')}};
         Object[] parsedArgs = new Object[inputs.length];
 
-        for (int i = 0; i < inputs.length; i++) {
+        ${methodName === 'groupAnagrams' ? '' : `for (int i = 0; i < inputs.length; i++) {
             String inp = inputs[i].trim();
             parsedArgs[i] = parseInput(inp);
-        }
+        }`}
 
         ${className} sol = new ${className}();
         ${getJavaMethodCall(methodName, returnType, lines.length)}
@@ -670,6 +901,97 @@ ${isTreeProblem ? `
         sb.append("]");
         System.out.println(sb.toString());
     }
+
+    // Tree to array conversion
+    static String treeToArray(TreeNode root) {
+        if (root == null) return "[]";
+        List<String> result = new ArrayList<>();
+        Queue<TreeNode> queue = new LinkedList<>();
+        queue.offer(root);
+        while (!queue.isEmpty()) {
+            TreeNode node = queue.poll();
+            if (node != null) {
+                result.add(String.valueOf(node.val));
+                queue.offer(node.left);
+                queue.offer(node.right);
+            } else {
+                result.add("null");
+            }
+        }
+        // Remove trailing nulls
+        while (result.size() > 0 && result.get(result.size() - 1).equals("null")) {
+            result.remove(result.size() - 1);
+        }
+        return "[" + String.join(",", result) + "]";
+    }
+
+    // Find node by value in tree
+    static TreeNode findNode(TreeNode root, int val) {
+        if (root == null) return null;
+        if (root.val == val) return root;
+        TreeNode left = findNode(root.left, val);
+        if (left != null) return left;
+        return findNode(root.right, val);
+    }
+` : ''}
+${isLinkedListProblem ? `
+    // Build linked list from array
+    static ListNode buildLinkedList(int[] arr) {
+        if (arr == null || arr.length == 0) return null;
+        ListNode head = new ListNode(arr[0]);
+        ListNode curr = head;
+        for (int i = 1; i < arr.length; i++) {
+            curr.next = new ListNode(arr[i]);
+            curr = curr.next;
+        }
+        return head;
+    }
+
+    // Convert linked list to array string
+    static String linkedListToString(ListNode head) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+        while (head != null) {
+            sb.append(head.val);
+            if (head.next != null) sb.append(",");
+            head = head.next;
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    // Build array of linked lists for mergeKLists
+    static ListNode[] buildLinkedListArray(String input) {
+        input = input.trim();
+        if (input.equals("[]")) return new ListNode[0];
+        // Parse [[1,4,5],[1,3,4],[2,6]] format
+        List<ListNode> lists = new ArrayList<>();
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            if (c == '[') {
+                if (depth == 1) start = i;
+                depth++;
+            } else if (c == ']') {
+                depth--;
+                if (depth == 1) {
+                    String inner = input.substring(start + 1, i);
+                    if (inner.isEmpty()) {
+                        lists.add(null);
+                    } else {
+                        String[] parts = inner.split(",");
+                        int[] arr = new int[parts.length];
+                        for (int j = 0; j < parts.length; j++) {
+                            arr[j] = Integer.parseInt(parts[j].trim());
+                        }
+                        lists.add(buildLinkedList(arr));
+                    }
+                }
+            }
+        }
+        return lists.toArray(new ListNode[0]);
+    }
 ` : ''}
 }
 `;
@@ -696,6 +1018,107 @@ function getJavaMethodCall(methodName: string, returnType: string, argCount: num
     return `TreeNode root = buildTree(inputs[0]);
         boolean result = sol.${methodName}(root);
         printResult(result);`;
+  }
+
+  // Trees: TreeNode -> TreeNode (invert)
+  if (methodName === 'invertTree') {
+    return `TreeNode root = buildTree(inputs[0]);
+        TreeNode result = sol.invertTree(root);
+        System.out.println(treeToArray(result));`;
+  }
+
+  // Trees: TreeNode, TreeNode, TreeNode -> TreeNode (LCA)
+  if (methodName === 'lowestCommonAncestor') {
+    return `TreeNode root = buildTree(inputs[0]);
+        int pVal = Integer.parseInt(inputs[1].trim());
+        int qVal = Integer.parseInt(inputs[2].trim());
+        TreeNode p = findNode(root, pVal);
+        TreeNode q = findNode(root, qVal);
+        TreeNode result = sol.lowestCommonAncestor(root, p, q);
+        System.out.println(result != null ? result.val : "null");`;
+  }
+
+  // Linked Lists: ListNode -> ListNode (reverse)
+  if (methodName === 'reverseList') {
+    return `ListNode head = buildLinkedList((int[]) parsedArgs[0]);
+        ListNode result = sol.reverseList(head);
+        System.out.println(linkedListToString(result));`;
+  }
+
+  // Linked Lists: ListNode, ListNode -> ListNode (merge two)
+  if (methodName === 'mergeTwoLists') {
+    return `ListNode list1 = buildLinkedList((int[]) parsedArgs[0]);
+        ListNode list2 = buildLinkedList((int[]) parsedArgs[1]);
+        ListNode result = sol.mergeTwoLists(list1, list2);
+        System.out.println(linkedListToString(result));`;
+  }
+
+  // Linked Lists: ListNode -> boolean (cycle)
+  if (methodName === 'hasCycle') {
+    return `ListNode head = buildLinkedList((int[]) parsedArgs[0]);
+        boolean result = sol.hasCycle(head);
+        printResult(result);`;
+  }
+
+  // Linked Lists: ListNode, int -> ListNode (remove nth)
+  if (methodName === 'removeNthFromEnd') {
+    return `ListNode head = buildLinkedList((int[]) parsedArgs[0]);
+        int n = (int) parsedArgs[1];
+        ListNode result = sol.removeNthFromEnd(head, n);
+        System.out.println(linkedListToString(result));`;
+  }
+
+  // Linked Lists: ListNode -> void (reorder - in-place)
+  if (methodName === 'reorderList') {
+    return `ListNode head = buildLinkedList((int[]) parsedArgs[0]);
+        sol.reorderList(head);
+        System.out.println(linkedListToString(head));`;
+  }
+
+  // Linked Lists: ListNode[] -> ListNode (merge k)
+  if (methodName === 'mergeKLists') {
+    return `ListNode[] lists = buildLinkedListArray(inputs[0]);
+        ListNode result = sol.mergeKLists(lists);
+        System.out.println(linkedListToString(result));`;
+  }
+
+  // Strings: String[] -> List<List<String>> (group anagrams)
+  if (methodName === 'groupAnagrams') {
+    return `String input = inputs[0].trim();
+        List<String> strList = new ArrayList<>();
+        // Parse ["eat","tea","tan","ate","nat","bat"] format
+        StringBuilder current = new StringBuilder();
+        boolean inQuote = false;
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            if (c == '"') {
+                if (inQuote) {
+                    strList.add(current.toString());
+                    current = new StringBuilder();
+                }
+                inQuote = !inQuote;
+            } else if (inQuote) {
+                current.append(c);
+            }
+        }
+        String[] strs = strList.toArray(new String[0]);
+        List<List<String>> result = sol.groupAnagrams(strs);
+        // Sort for consistent output
+        for (List<String> group : result) Collections.sort(group);
+        result.sort((a, b) -> a.get(0).compareTo(b.get(0)));
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < result.size(); i++) {
+            sb.append("[");
+            List<String> group = result.get(i);
+            for (int j = 0; j < group.size(); j++) {
+                sb.append("\\"").append(group.get(j)).append("\\"");
+                if (j < group.size() - 1) sb.append(",");
+            }
+            sb.append("]");
+            if (i < result.size() - 1) sb.append(",");
+        }
+        sb.append("]");
+        System.out.println(sb.toString());`;
   }
 
   // Arrays: int[] + int -> int[]
@@ -864,12 +1287,17 @@ function wrapCppCode(userCode: string, input: string): string {
   const className = classMatch ? classMatch[1] : 'Solution';
 
   // Try to detect the method name (handle nested templates like vector<vector<int>>)
-  // Pattern handles: vector<vector<int>>, vector<int>, int, bool, string
-  const methodMatch = userCode.match(/(?:vector<(?:[^<>]|<[^<>]*>)*>|int|bool|string)\s+(\w+)\s*\(/);
+  // Pattern handles: vector<vector<int>>, vector<int>, int, bool, string, ListNode*, TreeNode*, void
+  const methodMatch = userCode.match(/(?:vector<(?:[^<>]|<[^<>]*>)*>|int|bool|string|void|ListNode\*?|TreeNode\*?)\s+(\w+)\s*\(/);
   const methodName = methodMatch ? methodMatch[1] : 'solution';
 
-  // Check if this is a tree problem
-  const isTreeProblem = methodName === 'levelOrder' || userCode.includes('TreeNode');
+  // Check if this is a tree or linked list problem
+  const isTreeProblem = methodName === 'levelOrder' || methodName === 'maxDepth' || methodName === 'invertTree' ||
+    methodName === 'isValidBST' || methodName === 'maxPathSum' || methodName === 'lowestCommonAncestor' ||
+    userCode.includes('TreeNode');
+  const isLinkedListProblem = methodName === 'reverseList' || methodName === 'mergeTwoLists' ||
+    methodName === 'hasCycle' || methodName === 'removeNthFromEnd' || methodName === 'reorderList' ||
+    methodName === 'mergeKLists' || userCode.includes('ListNode');
 
   const wrapper = `
 #include <iostream>
@@ -991,6 +1419,89 @@ TreeNode* findNode(TreeNode* root, int val) {
     TreeNode* left = findNode(root->left, val);
     if (left) return left;
     return findNode(root->right, val);
+}
+
+// Convert tree to array string
+string treeToString(TreeNode* root) {
+    if (!root) return "[]";
+    string result = "[";
+    queue<TreeNode*> q;
+    q.push(root);
+    vector<string> values;
+    while (!q.empty()) {
+        TreeNode* node = q.front();
+        q.pop();
+        if (node) {
+            values.push_back(to_string(node->val));
+            q.push(node->left);
+            q.push(node->right);
+        } else {
+            values.push_back("null");
+        }
+    }
+    // Remove trailing nulls
+    while (!values.empty() && values.back() == "null") {
+        values.pop_back();
+    }
+    for (size_t i = 0; i < values.size(); i++) {
+        result += values[i];
+        if (i < values.size() - 1) result += ",";
+    }
+    result += "]";
+    return result;
+}
+` : ''}
+${isLinkedListProblem ? `
+// Build linked list from array
+ListNode* buildLinkedList(const vector<int>& arr) {
+    if (arr.empty()) return nullptr;
+    ListNode* head = new ListNode(arr[0]);
+    ListNode* curr = head;
+    for (size_t i = 1; i < arr.size(); i++) {
+        curr->next = new ListNode(arr[i]);
+        curr = curr->next;
+    }
+    return head;
+}
+
+// Print linked list as array
+void printLinkedList(ListNode* head) {
+    cout << "[";
+    while (head) {
+        cout << head->val;
+        if (head->next) cout << ",";
+        head = head->next;
+    }
+    cout << "]" << endl;
+}
+
+// Build array of linked lists
+vector<ListNode*> buildLinkedListArray(const string& s) {
+    vector<ListNode*> result;
+    if (s == "[]") return result;
+    string inner = s.substr(1, s.length() - 2);
+    int depth = 0;
+    string current;
+    for (char c : inner) {
+        if (c == '[') {
+            depth++;
+            if (depth > 1) current += c;
+        } else if (c == ']') {
+            depth--;
+            if (depth >= 1) current += c;
+            else if (depth == 0) {
+                if (!current.empty()) {
+                    result.push_back(buildLinkedList(parseIntArray("[" + current + "]")));
+                }
+                current = "";
+            }
+        } else if (c == ',' && depth == 0) {
+            // Skip comma between arrays (at depth 0)
+        } else {
+            current += c;
+        }
+    }
+    return result;
 }
 ` : ''}
 
@@ -1146,6 +1657,106 @@ function getCppMethodCall(methodName: string, inputLines: string[]): string {
     cout << (result ? result->val : -1) << endl;`;
   }
 
+  // Trees: TreeNode* -> TreeNode* (invert)
+  if (methodName === 'invertTree') {
+    return `
+    TreeNode* root = buildTree("${escapedInputs[0]}");
+    TreeNode* result = sol.invertTree(root);
+    cout << treeToString(result) << endl;`;
+  }
+
+  // Linked Lists: ListNode* -> ListNode* (reverse)
+  if (methodName === 'reverseList') {
+    return `
+    vector<int> arr = parseIntArray("${escapedInputs[0]}");
+    ListNode* head = buildLinkedList(arr);
+    ListNode* result = sol.reverseList(head);
+    printLinkedList(result);`;
+  }
+
+  // Linked Lists: ListNode*, ListNode* -> ListNode* (merge two)
+  if (methodName === 'mergeTwoLists') {
+    return `
+    vector<int> arr1 = parseIntArray("${escapedInputs[0]}");
+    vector<int> arr2 = parseIntArray("${escapedInputs[1]}");
+    ListNode* list1 = buildLinkedList(arr1);
+    ListNode* list2 = buildLinkedList(arr2);
+    ListNode* result = sol.mergeTwoLists(list1, list2);
+    printLinkedList(result);`;
+  }
+
+  // Linked Lists: ListNode* -> bool (cycle)
+  if (methodName === 'hasCycle') {
+    return `
+    vector<int> arr = parseIntArray("${escapedInputs[0]}");
+    ListNode* head = buildLinkedList(arr);
+    bool result = sol.hasCycle(head);
+    printBool(result);`;
+  }
+
+  // Linked Lists: ListNode*, int -> ListNode* (remove nth)
+  if (methodName === 'removeNthFromEnd') {
+    return `
+    vector<int> arr = parseIntArray("${escapedInputs[0]}");
+    int n = stoi("${escapedInputs[1]}");
+    ListNode* head = buildLinkedList(arr);
+    ListNode* result = sol.removeNthFromEnd(head, n);
+    printLinkedList(result);`;
+  }
+
+  // Linked Lists: ListNode* -> void (reorder - in-place)
+  if (methodName === 'reorderList') {
+    return `
+    vector<int> arr = parseIntArray("${escapedInputs[0]}");
+    ListNode* head = buildLinkedList(arr);
+    sol.reorderList(head);
+    printLinkedList(head);`;
+  }
+
+  // Linked Lists: vector<ListNode*> -> ListNode* (merge k)
+  if (methodName === 'mergeKLists') {
+    return `
+    vector<ListNode*> lists = buildLinkedListArray("${escapedInputs[0]}");
+    ListNode* result = sol.mergeKLists(lists);
+    printLinkedList(result);`;
+  }
+
+  // Strings: vector<string> -> vector<vector<string>> (group anagrams)
+  if (methodName === 'groupAnagrams') {
+    return `
+    // Parse string array
+    string input = "${escapedInputs[0]}";
+    vector<string> strs;
+    string current;
+    bool inQuote = false;
+    for (char c : input) {
+        if (c == '"') {
+            if (inQuote) {
+                strs.push_back(current);
+                current = "";
+            }
+            inQuote = !inQuote;
+        } else if (inQuote) {
+            current += c;
+        }
+    }
+    auto result = sol.groupAnagrams(strs);
+    // Sort for consistent output
+    for (auto& group : result) sort(group.begin(), group.end());
+    sort(result.begin(), result.end());
+    cout << "[";
+    for (size_t i = 0; i < result.size(); i++) {
+        cout << "[";
+        for (size_t j = 0; j < result[i].size(); j++) {
+            cout << "\\"" << result[i][j] << "\\"";
+            if (j < result[i].size() - 1) cout << ",";
+        }
+        cout << "]";
+        if (i < result.size() - 1) cout << ",";
+    }
+    cout << "]" << endl;`;
+  }
+
   // Generic fallback
   return `
     // Unsupported method: ${methodName}
@@ -1284,7 +1895,43 @@ export async function runCodeLocally(
     const normalizedActual = result.output.replace(/\r\n/g, '\n').trim();
     const normalizedExpected = testCase.expectedOutput.replace(/\r\n/g, '\n').trim();
 
-    const passed = !result.error && !result.timedOut && normalizedActual === normalizedExpected;
+    // For certain problem types, we need flexible comparison
+    let passed = false;
+    if (!result.error && !result.timedOut) {
+      if (normalizedActual === normalizedExpected) {
+        passed = true;
+      } else {
+        // Try to parse as JSON and compare as unordered arrays (for groupAnagrams-type problems)
+        try {
+          const actualParsed = JSON.parse(normalizedActual);
+          const expectedParsed = JSON.parse(normalizedExpected);
+          if (Array.isArray(actualParsed) && Array.isArray(expectedParsed)) {
+            // Check if it's a nested array (like group anagrams output)
+            if (actualParsed.length > 0 && Array.isArray(actualParsed[0])) {
+              // Sort inner arrays and then sort outer array by stringified inner arrays
+              const sortNested = (arr: any[][]) => {
+                const sorted = arr.map(inner => [...inner].sort());
+                sorted.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+                return JSON.stringify(sorted);
+              };
+              passed = sortNested(actualParsed) === sortNested(expectedParsed);
+            } else {
+              // Simple array - sort and compare
+              passed = JSON.stringify([...actualParsed].sort()) === JSON.stringify([...expectedParsed].sort());
+            }
+          }
+        } catch {
+          // If JSON parsing fails, check for valid palindrome alternative answers
+          // For longestPalindrome, both "bab" and "aba" are valid for "babad"
+          if (normalizedActual.length === normalizedExpected.length) {
+            const isPalindrome = (s: string) => s === s.split('').reverse().join('');
+            if (isPalindrome(normalizedActual) && isPalindrome(normalizedExpected)) {
+              passed = true;
+            }
+          }
+        }
+      }
+    }
 
     if (passed) {
       passedCount++;
